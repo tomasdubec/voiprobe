@@ -4,6 +4,7 @@
 #include <sstream>
 #include <stdlib.h>
 #include <netinet/ip.h>
+#include <time.h>
 #include "packet.h"
 #include "db.h"
 
@@ -12,19 +13,22 @@
 
 using namespace std;
 
+extern DB *db;
+
 class PacketCatcher{
 	pcap_t *pcap_handle;
 	string filter;
+	string shost, dhost;
 
 	void initFilter(void);
 	string itoa(int);
 	string getStrIP(int);
-public:
-	PacketCatcher(string);
-	~PacketCatcher();
 	void setFilter(string);
 	void setFilter(string, string);
 	void setFilter(string, int, string, int);
+public:
+	PacketCatcher(string, string, string);
+	~PacketCatcher();
 	int getSeqNum(const u_char *);
 	int getTime(const u_char *);
 	void start(bool);

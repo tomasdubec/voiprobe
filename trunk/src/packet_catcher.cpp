@@ -2,8 +2,11 @@
 
 using namespace std;
 
-PacketCatcher::PacketCatcher(string iface){
+PacketCatcher::PacketCatcher(string iface, string src_host, string dst_host){
 	char ebuf[PCAP_ERRBUF_SIZE];
+
+	shost = src_host;
+	dhost = dst_host;
 
 	if((pcap_handle = pcap_open_live(iface.c_str(), 65000, 0, 1, ebuf)) == NULL){
 		cerr << "pcap_open_live: " << ebuf << endl;
@@ -49,14 +52,9 @@ void PacketCatcher::initFilter(void){
 	filter = "udp ";
 }
 
-void PacketCatcher::setFilter(string host){
+void PacketCatcher::setFilter(string host1, string host2){
 	initFilter();
-	filter += "and host " + host;
-}
-
-void PacketCatcher::setFilter(string src_host, string dst_host){
-	initFilter();
-	filter += "and src host " + src_host + " and dst host " + dst_host;
+	filter += "and (host " + host1 + " or host " + host2 + ")";
 }
 
 void PacketCatcher::setFilter(string src_host, int src_port, string dst_host, int dst_port){
@@ -73,8 +71,14 @@ void PacketCatcher::start(bool adapt){
 	const struct ip *ip_header;
 	const struct rtp *rtp_header;
 	const u_char *packet;
-	DB db("cap.db");
 	int i = 0;
+	bool ocapture = false, icapture = false;
+	int issrc_lock, ossrc_lock; //for locking on first starting stream detected
+	struct timeval cas;
+	int start_time;
+	long realtime;
+
+	setFilter(shost, dhost);
 
 	if(pcap_compile(pcap_handle, &bp, filter.c_str(), 1, 0) == -1){
 		cerr << "pcap_compile: " << pcap_geterr(pcap_handle) << endl;
@@ -86,19 +90,54 @@ void PacketCatcher::start(bool adapt){
 		exit(-1);
 	}
 
-	if(!db.createTables())
-		return;
+	start_time = time(NULL);
 
-	while(i < 30){
+	while(i < 200){
 		packet = pcap_next(pcap_handle, &header);
+		if(packet == NULL)
+			continue;
+
+		gettimeofday(&cas, NULL);
+		realtime = (cas.tv_sec - start_time) * 1000000 + cas.tv_usec;
+
 		Packet p(packet, header.len);
-		cout << "seq_num: " << dec << p.getSeqNum();
-		cout << " time: " << p.getTimestamp() << endl;
-		db.insertPacket(p.getSeqNum(), p.getTimestamp(), p.getSsrc());
-		/*if(packet != NULL){
-			cout << "seq_num: " << dec << getSeqNum(packet);
-			cout << " time: " << getTime(packet) << endl;
-		}*/
+
+		if(getStrIP(p.getSHost()) == shost){
+			if(!ocapture){//we haven't find the begining of outgoing traffic yet
+				if(p.getMarker() && p.getTimestamp() == 0){
+					ocapture = true;
+					ossrc_lock = p.getSsrc();
+					cout << "* found start of outgoing comunication" << endl;
+				}
+				else
+					continue;
+			}
+			if(ossrc_lock == p.getSsrc()){ //it is a packet from our stream
+				cout << "outgoing packet:" << endl;
+				db->insertOutgoingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
+			}
+		}
+		else{
+			if(!icapture){//we haven't find the begining of incoming traffic yet
+				if(p.getMarker() && p.getTimestamp() == 0){
+					icapture = true;
+					issrc_lock = p.getSsrc();
+					cout << "* found start of incoming comunication" << endl;
+				}
+				else
+					continue;
+			}
+			if(issrc_lock == p.getSsrc()){ //it is a packet from our stream
+				cout << "incoming packet:" << endl;
+				db->insertIncomingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
+			}
+		}
+
+		cout << "\tseq_num: " << dec << p.getSeqNum();
+		cout << " time: " << p.getTimestamp();
+		cout << " ssrc: 0x" << hex << p.getSsrc() << dec << endl << endl;
+
+
 		i++;
 	}
 }
