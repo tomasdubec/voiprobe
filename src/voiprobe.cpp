@@ -20,12 +20,16 @@ string itoa(int number){
 
 void *runPacketCatcher(void *d){
 	PacketCatcher *pcatcher;
+	char **argv = (char **)d;
 
 	cout << "[*] packet catcher thread created\n";
-	pcatcher = new PacketCatcher("eth1", "192.168.0.100", "192.168.0.55");
+	pcatcher = new PacketCatcher(argv[1], argv[2], argv[3]);
+	//pcatcher = new PacketCatcher("eth1", "192.168.0.100", "192.168.0.55");
 	pcatcher->start(true);
 
 	delete pcatcher;
+
+	cout << "[*] packet catcher thread quitting\n";
 }
 
 void *runReplyServer(void *d){
@@ -34,12 +38,25 @@ void *runReplyServer(void *d){
 	cout << "[*] reply server thread created\n";
 	rs = new ReplyServer();
 	rs->start();
+
+	delete rs;
+
+	cout << "[*] reply server thread quitting\n";
+}
+
+void usage(void){
+	cout << "usage: voiprobe interface my_client_IP other_client_IP other_probe_IP other_probe_port" << endl;
 }
 
 int main(int argc, char **argv){
 	pthread_t thrCatcher;
 	pthread_t thrReply;
 	LatencyComputer *lc;
+
+	if(argc < 5){
+		usage();
+		exit(0);
+	}
 
 	if(sqlite3_threadsafe() != 1){
 		cerr << "voiprobe needs SQLite library to be compiled with SQLITE_THREADSAFE set to 1 (serialized). SQLite library on this system is compiled with SQLITE_THREADSAFE == " << sqlite3_threadsafe() << ".\n";
@@ -55,7 +72,7 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
-	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, NULL) != 0){
+	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, (void*)argv) != 0){
 		cerr << "unable to create packet catcher thread!\n";
 		exit(-1);
 	}
@@ -64,10 +81,14 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
-	lc = new LatencyComputer("localhost", 34567);
+	cout << "[*] latency computer thread created\n";
+
+	lc = new LatencyComputer(argv[4], atoi(argv[5]));
 	lc->start();
 
 	delete lc;
+
+	cout << "[*] latency computer thread quitting\n";
 
 	pthread_join(thrCatcher, NULL);
 	pthread_join(thrReply, NULL);

@@ -54,6 +54,9 @@ void ReplyServer::start(){
 		perror("accept");
 		return;
 	}
+
+	cout << "[*] second probe connected\n";
+
 	//reply to requests
 	while(true){
 		if((size = recv(soketka, buf, 1000, NULL)) == -1){
@@ -63,19 +66,31 @@ void ReplyServer::start(){
 		if(size > 0){
 			buf[size]='\0';
 			req = (vpPacket *)buf;
-			cout << "type: " << req->type << ", version: " << req->version << ", time shift: " << ntohs(req->time_shift) << ", packet number: " << ntohl(req->packet_number) << endl;
+			cout << "got request for " << ntohl(req->packet_number) << endl;
 			if(req->type != PACKET_REQUEST)
 				continue;
 
-			db->getClosest(ntohl(req->packet_number), fid, timeshift);
-			cout << "send reply:\n\tseqid: " << fid << "\n\ttime shift: " << timeshift << endl;
-			tmp.type = PACKET_REPLY;
-			tmp.version = 1;
-			tmp.time_shift = htons(timeshift);
-			tmp.packet_number = htonl(fid);
-			if(send(soketka, &tmp, sizeof(vpPacket), NULL) == -1){
-				perror("send");
-				return;
+			if(db->getClosest(ntohl(req->packet_number), fid, timeshift)){
+				cout << "send reply:\n\tseqid: " << fid << "\n\ttime shift: " << timeshift << endl;
+				tmp.type = PACKET_REPLY;
+				tmp.version = 1;
+				tmp.time_shift = htons(timeshift);
+				tmp.packet_number = htonl(fid);
+				if(send(soketka, &tmp, sizeof(vpPacket), NULL) == -1){
+					perror("send");
+					return;
+				}
+			}
+			else{
+				cout << "sending error\n";
+				tmp.type = PACKET_ERROR;
+				tmp.version = 1;
+				tmp.time_shift = 0;
+				tmp.packet_number = htonl(PACKET_ERROR_NO_REPLY);
+				if(send(soketka, &tmp, sizeof(vpPacket), NULL) == -1){
+					perror("send");
+					return;
+				}
 			}
 		}
 		else{

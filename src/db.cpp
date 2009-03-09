@@ -73,15 +73,27 @@ int DB::getPacketCallback(void *data, int argc, char **argv, char **colName){
 }
 
 bool DB::getLatestOutgoingPacket(int &sid, int &ts, int &rt, int &ss){
+	pid = -1;
+	char *err;
+
 	if(sqlite3_exec(db, string("SELECT * FROM out_packets ORDER BY realtime DESC LIMIT 1").c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
 		cerr << "getLatestOutgoingPacket 1 failed!\n";
 		return false;
 	}
 
+	if(pid == -1)
+		return false;
+
 	sid = pid;
 	ts = timestamp;
 	rt = realtime;
 	ss = ssrc;
+
+	//TODO change this to some kind of deletePacket method
+	if(sqlite3_exec(db, string("DELETE FROM out_packets WHERE seqid = " + itoa(sid)).c_str(), this->getPacketCallback, this, &err) != SQLITE_OK){
+		cerr << "getLatestOutgoingPacket 2 failed: " << err << endl;
+		return false;
+	}
 
 	return true;
 }
@@ -96,8 +108,9 @@ bool DB::getClosest(int id, int &fid, int &ts){
 		return false;
 	}
 
-	if(pid == -1)
+	if(pid == -1){
 		return false;
+	}
 
 	rt = realtime;
 	
@@ -109,17 +122,39 @@ bool DB::getClosest(int id, int &fid, int &ts){
 	}
 
 	if(pid == -1){ //no outgoing packet after the questioned incoming. will try first before
+		cout << "novejsi jsem nenasel\n";
 		if(sqlite3_exec(db, string("SELECT * FROM out_packets WHERE realtime < " + itoa(realtime) + " ORDER BY realtime DESC LIMIT 1").c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
 			cerr << "getClosest 3 failed!\n";
 			return false;
 		}
 	}
-	if(pid == -1)
+	if(pid == -1){
+		cout << "starsi taky ne\n";
 		return false;
+	}
 
 	ts = rt - realtime;
 	fid = pid;
 
 	return true;
 }
+
+bool DB::getIncomingPacket(int sid, int &ts, int &rt, int &ss){
+	pid = -1;
+
+	if(sqlite3_exec(db, string("SELECT * FROM in_packets WHERE seqid = " + itoa(sid)).c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
+		cerr << "getLatestOutgoingPacket 1 failed!\n";
+		return false;
+	}
+
+	if(pid == -1){
+		return false;
+	}
+	ts = timestamp;
+	rt = realtime;
+	ss = ssrc;
+
+	return true;
+}
+
 

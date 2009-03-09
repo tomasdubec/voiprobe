@@ -23,6 +23,7 @@ public:
 	bool insertIncomingPacket(int, int, int, int);
 	bool getClosest(int, int&, int&);
 	bool getLatestOutgoingPacket(int&, int&, int&, int&);
+	bool getIncomingPacket(int, int&, int&, int&);
 };
 
 #endif
