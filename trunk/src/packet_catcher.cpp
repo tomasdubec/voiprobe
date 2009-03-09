@@ -98,6 +98,8 @@ void PacketCatcher::start(bool adapt){
 			continue;
 
 		gettimeofday(&cas, NULL);
+		cout << "my time:   " << cas.tv_usec << endl;
+		cout << "pcap time: " << header.ts.tv_usec << endl;
 		realtime = (cas.tv_sec - start_time) * 1000000 + cas.tv_usec;
 
 		Packet p(packet, header.len);
