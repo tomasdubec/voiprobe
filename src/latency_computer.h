@@ -12,6 +12,9 @@
 #include "db.h"
 
 extern DB *db;
+extern double globalLatency;
+extern int latencyCount;
+extern pthread_mutex_t mtxDB;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;

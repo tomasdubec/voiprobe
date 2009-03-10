@@ -98,9 +98,8 @@ void PacketCatcher::start(bool adapt){
 			continue;
 
 		gettimeofday(&cas, NULL);
-		cout << "my time:   " << cas.tv_usec << endl;
-		cout << "pcap time: " << header.ts.tv_usec << endl;
-		realtime = (cas.tv_sec - start_time) * 1000000 + cas.tv_usec;
+		realtime = (header.ts.tv_sec - start_time) * 1000000 + header.ts.tv_usec;
+		//realtime = (cas.tv_sec - start_time) * 1000000 + cas.tv_usec;
 
 		Packet p(packet, header.len);
 
@@ -115,7 +114,7 @@ void PacketCatcher::start(bool adapt){
 					continue;
 			}
 			if(ossrc_lock == p.getSsrc()){ //it is a packet from our stream
-				cout << "outgoing packet:" << endl;
+				//cout << "outgoing packet:" << endl;
 				db->insertOutgoingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
 			}
 		}
@@ -130,15 +129,14 @@ void PacketCatcher::start(bool adapt){
 					continue;
 			}
 			if(issrc_lock == p.getSsrc()){ //it is a packet from our stream
-				cout << "incoming packet:" << endl;
+				//cout << "incoming packet:" << endl;
 				db->insertIncomingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
 			}
 		}
 
-		cout << "\tseq_num: " << dec << p.getSeqNum();
+		/*cout << "\tseq_num: " << dec << p.getSeqNum();
 		cout << " time: " << p.getTimestamp();
-		cout << " ssrc: 0x" << hex << p.getSsrc() << dec << endl << endl;
-
+		cout << " ssrc: 0x" << hex << p.getSsrc() << dec << endl << endl;*/
 
 		i++;
 	}

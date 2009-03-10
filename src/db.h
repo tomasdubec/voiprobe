@@ -21,7 +21,7 @@ public:
 	bool createTables(void);
 	bool insertOutgoingPacket(int, int, int, int);
 	bool insertIncomingPacket(int, int, int, int);
-	bool getClosest(int, int&, int&);
+	bool getClosest(int, int&, int32_t&);
 	bool getLatestOutgoingPacket(int&, int&, int&, int&);
 	bool getIncomingPacket(int, int&, int&, int&);
 };

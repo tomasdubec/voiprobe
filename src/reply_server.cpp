@@ -39,7 +39,8 @@ void ReplyServer::start(){
 	int soketka;
 	vpPacket *req;
 	vpPacket tmp;
-	int timeshift, fid;
+	int fid;
+	int32_t timeshift;
 
 	if(!startListen()){
 		perror("error creating server");
@@ -69,12 +70,17 @@ void ReplyServer::start(){
 			cout << "got request for " << ntohl(req->packet_number) << endl;
 			if(req->type != PACKET_REQUEST)
 				continue;
-
+			
+			pthread_mutex_lock(&mtxDB);
 			if(db->getClosest(ntohl(req->packet_number), fid, timeshift)){
-				cout << "send reply:\n\tseqid: " << fid << "\n\ttime shift: " << timeshift << endl;
+				pthread_mutex_unlock(&mtxDB);
+				cout << "sending reply (ts: " << timeshift << ")\n";
+				//cout << "sending reply:\n\tseqid: " << fid << "\n\ttime shift: " << timeshift << endl;
+				int32_t test = ntohl(htonl(timeshift));
+				cout << "htonl(htonl(timeshift)): " << test << endl;
 				tmp.type = PACKET_REPLY;
 				tmp.version = 1;
-				tmp.time_shift = htons(timeshift);
+				tmp.time_shift = htonl(timeshift);
 				tmp.packet_number = htonl(fid);
 				if(send(soketka, &tmp, sizeof(vpPacket), NULL) == -1){
 					perror("send");
@@ -82,6 +88,7 @@ void ReplyServer::start(){
 				}
 			}
 			else{
+				pthread_mutex_unlock(&mtxDB);
 				cout << "sending error\n";
 				tmp.type = PACKET_ERROR;
 				tmp.version = 1;
