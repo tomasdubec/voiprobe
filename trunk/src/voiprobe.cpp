@@ -10,6 +10,9 @@ using namespace std;
 DB *db;
 pthread_mutex_t mtxDB = PTHREAD_MUTEX_INITIALIZER;
 
+double globalLatency = 0;
+int latencyCount = 0;
+
 string itoa(int number){
 	stringstream s;
 
@@ -30,6 +33,8 @@ void *runPacketCatcher(void *d){
 	delete pcatcher;
 
 	cout << "[*] packet catcher thread quitting\n";
+
+	cout << "average latency: " << (double)globalLatency / (double)latencyCount / (double)2 << "ms" << endl;
 }
 
 void *runReplyServer(void *d){

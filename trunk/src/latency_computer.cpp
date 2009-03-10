@@ -53,12 +53,14 @@ void LatencyComputer::start(){
 	cout << "[*] latency computer connected to probe\n";
 
 	while(true){
+		pthread_mutex_lock(&mtxDB);
 		if(db->getLatestOutgoingPacket(seqid, timestamp, realtime, ssrc)){
+			pthread_mutex_unlock(&mtxDB);
 			tmp.type = PACKET_REQUEST;
 			tmp.version = 1;
 			tmp.time_shift = 0;
 			tmp.packet_number = htonl(seqid);
-			cout << "requesting seqid " << seqid << endl;
+			cout << "\t\t\t\t\trequesting seqid " << seqid << endl;
 			if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
 				perror("LatencyComputer send error");
 				return;
@@ -69,17 +71,21 @@ void LatencyComputer::start(){
 			}
 			if(tmp.type == PACKET_REPLY){
 				rsid = ntohl(tmp.packet_number);
-				cout << "got reply " << rsid << endl;
+				cout << "\t\t\t\t\tgot reply " << rsid << " (ts: " << (int32_t)ntohl(tmp.time_shift) << ")\n";
+				pthread_mutex_lock(&mtxDB);
 				if(db->getIncomingPacket(rsid, rtimestamp, rrealtime, rssrc)){
-					latency = abs(rrealtime - realtime) + ntohs(tmp.time_shift);
-					cout << "*********************************************** latency: " << latency << "************************************\n";
+					latency = rrealtime - realtime + (int32_t)ntohl(tmp.time_shift);
+					cout << "\t\t\t\t\t\t\t\tlatency: " << (double)latency / (double)2000 << "ms\n";
+					globalLatency += latency;
+					latencyCount++;
 				}
-
+				pthread_mutex_unlock(&mtxDB);
 			}
 			else if(tmp.type == PACKET_ERROR)
-				cout << "received error\n";
+				cout << "\t\t\t\t\treceived error\n";
 		}
 		else{
+			pthread_mutex_unlock(&mtxDB);
 			sleep(1);
 		}
 	}

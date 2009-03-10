@@ -14,6 +14,7 @@
 using namespace std;
 
 extern DB *db;
+extern pthread_mutex_t mtxDB;
 
 class PacketCatcher{
 	pcap_t *pcap_handle;

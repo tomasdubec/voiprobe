@@ -9,6 +9,7 @@
 #include "mypacket.h"
 
 extern DB *db;
+extern pthread_mutex_t mtxDB;
 
 class ReplyServer{
 	int port;

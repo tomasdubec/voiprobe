@@ -18,7 +18,7 @@ struct vpPacket{
 	unsigned int version:2;
 	unsigned int type:6;
 	#endif
-	u_int16_t time_shift;
+	int32_t time_shift;
 	u_int32_t packet_number;
 };
 #endif
