@@ -4,26 +4,21 @@
 #include <sqlite3.h>
 #include <iostream>
 #include <stdlib.h>
-#include <list>
 
 using namespace std;
 
 extern string itoa(int);
 
-struct __packet{
-	int seqid;
-	int timestamp;
-	int realtime;
-	int ssrc;
-	bool operator<(const __packet&)const;
-};
-
 class DB{
-	list<__packet> incomingPackets;
-	list<__packet> outgoingPackets;
+	struct sqlite3 *db;
+	string filename;
+	int pid, timestamp, realtime, ssrc; //info about loaded packet
+
+	static int getPacketCallback(void *, int, char **, char **);
 public:
 	DB(string);
 	~DB();
+	bool createTables(void);
 	bool insertOutgoingPacket(int, int, int, int);
 	bool insertIncomingPacket(int, int, int, int);
 	bool getClosest(int, int&, int32_t&);

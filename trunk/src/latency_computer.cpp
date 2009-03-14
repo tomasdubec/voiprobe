@@ -3,10 +3,31 @@
 LatencyComputer::LatencyComputer(string hst, int prt){
 	hostname = hst;
 	port = prt;
+
+	key = 28234;
+	sharedLatency = NULL;
+	createSharedMem();
 }
 
 LatencyComputer::~LatencyComputer(){
 
+}
+
+bool LatencyComputer::createSharedMem(void){
+	int shmid;
+	int tmp;
+
+	if((shmid = shmget(key, sizeof(int), IPC_CREAT | 0666)) < 0){
+		perror("shmget");
+		return false;
+	}
+
+	if((sharedLatency = (int *)shmat(shmid, NULL, 0)) == (int *)-1) {
+		perror("shmat");
+		return false;
+	}
+
+	return true;
 }
 
 bool LatencyComputer::connectProbe(){
@@ -52,7 +73,7 @@ void LatencyComputer::start(){
 	
 	cout << "[*] latency computer connected to probe\n";
 
-	while(true){
+	while(run){
 		pthread_mutex_lock(&mtxDB);
 		if(db->getLatestOutgoingPacket(seqid, timestamp, realtime, ssrc)){
 			pthread_mutex_unlock(&mtxDB);
@@ -75,11 +96,13 @@ void LatencyComputer::start(){
 				pthread_mutex_lock(&mtxDB);
 				if(db->getIncomingPacket(rsid, rtimestamp, rrealtime, rssrc)){
 					latency = rrealtime - realtime + (int32_t)ntohl(tmp.time_shift);
-					cout << "\t\t\t\t\t\t\t\tlatency: " << (double)latency / (double)2000 << "ms\n";
-					globalLatency += latency;
-					latencyCount++;
+					cout << "\t\t\t\t\t\t\t\tlatency: " << (double)latency / (double)1000 << "ms\n";
 				}
 				pthread_mutex_unlock(&mtxDB);
+				if(Latence == -1)
+					Latence = latency;
+				else
+					Latence = (Latence * 0.99) + (latency * 0.01);
 			}
 			else if(tmp.type == PACKET_ERROR)
 				cout << "\t\t\t\t\treceived error\n";

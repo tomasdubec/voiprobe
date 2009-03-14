@@ -1,163 +1,127 @@
 #include "db.h"
 
-DB::DB(string f){
-	db = NULL;
-	filename = f;
+bool __packet::operator<(const __packet &p)const{
+	if(realtime < p.realtime)
+		return true;
+	else
+		return false;
+}
 
-	if(sqlite3_open(filename.c_str(), &db) != SQLITE_OK){
-		cerr << "unable to open db file " << filename << endl;
-		throw "unable to open database!";
-	}
+DB::DB(string f){
+
 }
 
 DB::~DB(){
-	if(db != NULL)
-		if(sqlite3_close(db) != SQLITE_OK)
-			cerr << "unable to close db!\n";
 
-	unlink(filename.c_str());
-}
-
-bool DB::createTables(void){
-	char *err = NULL;
-
-	if(sqlite3_exec(db, "CREATE TABLE out_packets (seqid INT PRIMARY KEY, timestamp INT NOT NULL, realtime INT NNOT NULL, ssrc INT NOT NULL)", NULL, NULL, &err) != SQLITE_OK){
-		cerr << "createTables failed: " << err << endl;
-		return false;
-	}
-	if(sqlite3_exec(db, "CREATE TABLE in_packets (seqid INT PRIMARY KEY, timestamp INT NOT NULL, realtime INT NOT NULL, ssrc INT NOT NULL)", NULL, NULL, &err) != SQLITE_OK){
-		cerr << "createTables failed: " << err << endl;
-		return false;
-	}
-	return true;
 }
 
 bool DB::insertOutgoingPacket(int seqn, int timestamp, int realtime, int ssrc){
-	char *err = NULL;
+	__packet p;
 
-	if(sqlite3_exec(db, string("INSERT INTO out_packets VALUES(" + itoa(seqn) + ", " + itoa(timestamp) + ", " + itoa(realtime) + ", " + itoa(ssrc) + ")").c_str(), NULL, NULL, &err) != SQLITE_OK){
-		cerr << "insertOutgoingPacket failed: " << err << endl;
-		return false;
-	}
+	p.seqid = seqn;
+	p.timestamp = timestamp;
+	p.realtime = realtime;
+	p.ssrc = ssrc;
+
+	outgoingPackets.push_back(p);
+
 	return true;
 }
 
 bool DB::insertIncomingPacket(int seqn, int timestamp, int realtime, int ssrc){
-	char *err = NULL;
+	__packet p;
 
-	if(sqlite3_exec(db, string("INSERT INTO in_packets VALUES(" + itoa(seqn) + ", " + itoa(timestamp) + ", " + itoa(realtime) + ", " + itoa(ssrc) + ")").c_str(), NULL, NULL, &err) != SQLITE_OK){
-		cerr << "insertIncomingPacket failed: " << err << endl;
-		return false;
-	}
+	p.seqid = seqn;
+	p.timestamp = timestamp;
+	p.realtime = realtime;
+	p.ssrc = ssrc;
+
+	incomingPackets.push_back(p);
+
 	return true;
 }
 
-int DB::getPacketCallback(void *data, int argc, char **argv, char **colName){
-	DB *me;
-
-	me = (DB*)data;
-
-	/*cout << "**** loaded packet ****\n";
-	cout << "seqid: " << argv[0] << endl;
-	cout << "timestamp: " << argv[1] << endl;
-	cout << "realtime: " << argv[2] << endl;
-	cout << "ssrc: " << argv[3] << endl;
-	cout << "**** ************* ****\n";*/
-
-	me->pid = atoi(argv[0]);
-	me->timestamp = atoi(argv[1]);
-	me->realtime = atoi(argv[2]);
-	me->ssrc = atoi(argv[3]);
-
-	return 0;
-}
-
 bool DB::getLatestOutgoingPacket(int &sid, int &ts, int &rt, int &ss){
-	pid = -1;
-	char *err;
-
-
-	if(sqlite3_exec(db, string("SELECT * FROM out_packets ORDER BY realtime DESC LIMIT 1").c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
-		cerr << "getLatestOutgoingPacket 1 failed!\n";
+	list<__packet>::iterator it;
+	
+	if(outgoingPackets.empty())
 		return false;
-	}
 
-	if(pid == -1){
-		return false;
-	}
+	outgoingPackets.sort();
+	outgoingPackets.reverse();
 
-	sid = pid;
-	ts = timestamp;
-	rt = realtime;
-	ss = ssrc;
+	it = outgoingPackets.begin();
+	sid = it->seqid;
+	ts = it->timestamp;
+	rt = it->realtime;
+	ss = it->ssrc;
 
-	//TODO change this to some kind of deletePacket method
-	/*if(sqlite3_exec(db, string("DELETE FROM out_packets WHERE seqid = " + itoa(sid)).c_str(), this->getPacketCallback, this, &err) != SQLITE_OK){
-		cerr << "getLatestOutgoingPacket 2 failed: " << err << endl;
-		return false;
-	}*/
+	//TODO deletePacket method
 
 	return true;
 }
 
 bool DB::getClosest(int id, int &fid, int32_t &ts){
-	int rt;
+	__packet last, main;
+	list<__packet>::iterator it;
 
-
-	pid = -1;
-
-	if(sqlite3_exec(db, string("SELECT * FROM in_packets WHERE seqid = " + itoa(id)).c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
-		cerr << "getClosest 1 failed!\n";
+	if(outgoingPackets.empty())
 		return false;
-	}
 
-	if(pid == -1){
+	last.seqid = -1;
+	main.seqid = id;
+	if(!getIncomingPacket(id, main.timestamp, main.realtime, main.ssrc))
 		return false;
-	}
 
-	rt = realtime;
-	
-	pid = -1;
+	incomingPackets.sort();
 
-	if(sqlite3_exec(db, string("SELECT * FROM out_packets WHERE realtime > " + itoa(realtime) + " ORDER BY realtime ASC LIMIT 1").c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
-		cerr << "getClosest 2 failed!\n";
-		return false;
-	}
-
-	if(pid == -1){ //no outgoing packet after the questioned incoming. will try first before
-		//cout << "novejsi jsem nenasel\n";
-		if(sqlite3_exec(db, string("SELECT * FROM out_packets WHERE realtime < " + itoa(realtime) + " ORDER BY realtime DESC LIMIT 1").c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
-			cerr << "getClosest 3 failed!\n";
-			return false;
+	for(it = outgoingPackets.begin(); it != outgoingPackets.end(); it++){
+		if(main < (*it) && it != outgoingPackets.begin()){
+			if((main.realtime - last.realtime) > (it->realtime - main.realtime)){
+				fid = it->seqid;
+				ts = main.realtime - it->realtime;
+			}
+			else{
+				fid = last.seqid;
+				ts = main.realtime - last.realtime;
+			}
+			return true;
+		}
+		else if(main < (*it) && it == outgoingPackets.begin()){
+			fid = it->seqid;
+			ts = main.realtime - it->realtime;
+			return true;
+		}
+		else{
+			last.seqid = it->seqid;
+			last.timestamp = it->timestamp;
+			last.realtime = it->realtime;
+			last.ssrc = it->ssrc;
 		}
 	}
-	if(pid == -1){
-		//cout << "starsi taky ne\n";
-		return false;
-	}
-
-	ts = rt - realtime;
-	fid = pid;
-
+	//we didn't find bigger, but list is not empty, so last contains closest packet
+	fid = last.seqid;
+	ts = main.realtime - last.realtime;
+	
 	return true;
 }
 
 bool DB::getIncomingPacket(int sid, int &ts, int &rt, int &ss){
-	pid = -1;
+	list<__packet>::iterator it;
 
-	if(sqlite3_exec(db, string("SELECT * FROM in_packets WHERE seqid = " + itoa(sid)).c_str(), this->getPacketCallback, this, NULL) != SQLITE_OK){
-		cerr << "getLatestOutgoingPacket 1 failed!\n";
+	if(incomingPackets.empty())
 		return false;
+
+	for(it = incomingPackets.begin(); it != incomingPackets.end(); it++){
+		if(it->seqid == sid){
+			ts = it->timestamp;
+			rt = it->realtime;
+			ss = it->ssrc;
+			return true;
+		}
 	}
 
-	if(pid == -1){
-		return false;
-	}
-	ts = timestamp;
-	rt = realtime;
-	ss = ssrc;
-
-	return true;
+	return false;
 }
 
 

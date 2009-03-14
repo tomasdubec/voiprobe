@@ -4,14 +4,14 @@
 #include "packet_catcher.h"
 #include "reply_server.h"
 #include "latency_computer.h"
+#include "snmp.h"
 
 using namespace std;
 
 DB *db;
 pthread_mutex_t mtxDB = PTHREAD_MUTEX_INITIALIZER;
-
-double globalLatency = 0;
-int latencyCount = 0;
+int Latence;
+bool run;
 
 string itoa(int number){
 	stringstream s;
@@ -33,8 +33,6 @@ void *runPacketCatcher(void *d){
 	delete pcatcher;
 
 	cout << "[*] packet catcher thread quitting\n";
-
-	cout << "average latency: " << (double)globalLatency / (double)latencyCount / (double)2 << "ms" << endl;
 }
 
 void *runReplyServer(void *d){
@@ -49,6 +47,18 @@ void *runReplyServer(void *d){
 	cout << "[*] reply server thread quitting\n";
 }
 
+void *runSnmpServer(void *d){
+	Snmp *s;
+
+	cout << "[*] snmp server thread created\n";
+	s = new Snmp();
+	s->start();
+
+	delete s;
+
+	cout << "[*] snmp server thread quitting\n";
+}
+
 void usage(void){
 	cout << "usage: voiprobe interface my_client_IP other_client_IP other_probe_IP other_probe_port" << endl;
 }
@@ -56,7 +66,11 @@ void usage(void){
 int main(int argc, char **argv){
 	pthread_t thrCatcher;
 	pthread_t thrReply;
+	pthread_t thrSnmp;
 	LatencyComputer *lc;
+
+	Latence = -1;
+	run = true;
 
 	if(argc < 5){
 		usage();
@@ -73,9 +87,9 @@ int main(int argc, char **argv){
 	}*/
 
 	db = new DB("cap.db");
-	if(!db->createTables()){
+/*	if(!db->createTables()){
 		exit(-1);
-	}
+	}*/
 
 	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, (void*)argv) != 0){
 		cerr << "unable to create packet catcher thread!\n";
@@ -83,6 +97,10 @@ int main(int argc, char **argv){
 	}
 	if(pthread_create(&thrReply, NULL, runReplyServer, NULL) != 0){
 		cerr << "unable to create reply server thread!\n";
+		exit(-1);
+	}
+	if(pthread_create(&thrSnmp, NULL, runSnmpServer, NULL) != 0){
+		cerr << "unable to create snmp server thread!\n";
 		exit(-1);
 	}
 

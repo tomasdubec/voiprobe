@@ -1,6 +1,6 @@
-LIBS= -lpcap -lsqlite3 -lpthread
+LIBS= -lpcap -lsqlite3 -lpthread `net-snmp-config --libs` `net-snmp-config --agent-libs`
 CFLAGS= -c -g
-OBJECTS=voiprobe.o packet_catcher.o packet.o db.o reply_server.o latency_computer.o
+OBJECTS=voiprobe.o packet_catcher.o packet.o db.o reply_server.o latency_computer.o snmp.o
 
 all: voiprobe
 
@@ -21,6 +21,9 @@ reply_server.o: reply_server.cpp reply_server.h
 
 latency_computer.o: latency_computer.cpp latency_computer.h
 	g++ $(CFLAGS) -o latency_computer.o latency_computer.cpp
+
+snmp.o: snmp.cpp snmp.h
+	g++ $(CFLAGS) `net-snmp-config --cflags` -o snmp.o snmp.cpp
 
 voiprobe: $(OBJECTS)
 	g++ $(LIBS) -o voiprobe $(OBJECTS)
