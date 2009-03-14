@@ -59,7 +59,7 @@ void ReplyServer::start(){
 	cout << "[*] second probe connected\n";
 
 	//reply to requests
-	while(true){
+	while(run){
 		if((size = recv(soketka, buf, 1000, NULL)) == -1){
 			perror("error receiving");
 			return;

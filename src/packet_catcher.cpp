@@ -92,7 +92,7 @@ void PacketCatcher::start(bool adapt){
 
 	start_time = time(NULL);
 
-	while(i < 200){
+	while(run){
 		packet = pcap_next(pcap_handle, &header);
 		if(packet == NULL)
 			continue;

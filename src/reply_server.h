@@ -10,6 +10,7 @@
 
 extern DB *db;
 extern pthread_mutex_t mtxDB;
+extern bool run;
 
 class ReplyServer{
 	int port;
