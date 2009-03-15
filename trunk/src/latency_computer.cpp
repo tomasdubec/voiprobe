@@ -4,8 +4,7 @@ LatencyComputer::LatencyComputer(string hst, int prt){
 	hostname = hst;
 	port = prt;
 
-	key = 28234;
-	sharedLatency = NULL;
+	packetsProcesed = 0;
 	createSharedMem();
 }
 
@@ -95,21 +94,27 @@ void LatencyComputer::start(){
 				cout << "\t\t\t\t\tgot reply " << rsid << " (ts: " << (int32_t)ntohl(tmp.time_shift) << ")\n";
 				pthread_mutex_lock(&mtxDB);
 				if(db->getIncomingPacket(rsid, rtimestamp, rrealtime, rssrc)){
+					packetsProcesed++;
 					latency = rrealtime - realtime + (int32_t)ntohl(tmp.time_shift);
+					if(Latence == -1)
+						Latence = latency;
+					else
+						Latence = (Latence * 0.99) + (latency * 0.01);
+
+					if(!db->markGotAnswer(seqid)){
+						cerr << "error setting gotAnswer\n";
+					}
+
 					cout << "\t\t\t\t\t\t\t\tlatency: " << (double)latency / (double)1000 << "ms\n";
 				}
 				pthread_mutex_unlock(&mtxDB);
-				if(Latence == -1)
-					Latence = latency;
-				else
-					Latence = (Latence * 0.99) + (latency * 0.01);
 			}
 			else if(tmp.type == PACKET_ERROR)
 				cout << "\t\t\t\t\treceived error\n";
 		}
 		else{
 			pthread_mutex_unlock(&mtxDB);
-			sleep(1);
+			usleep(1000);
 		}
 	}
 }

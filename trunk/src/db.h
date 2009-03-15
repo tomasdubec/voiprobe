@@ -15,12 +15,14 @@ struct __packet{
 	int timestamp;
 	int realtime;
 	int ssrc;
+	bool gotAnswer;
 	bool operator<(const __packet&)const;
 };
 
 class DB{
 	list<__packet> incomingPackets;
 	list<__packet> outgoingPackets;
+	int req2soon; //for debuging purposes
 public:
 	DB(string);
 	~DB();
@@ -29,6 +31,7 @@ public:
 	bool getClosest(int, int&, int32_t&);
 	bool getLatestOutgoingPacket(int&, int&, int&, int&);
 	bool getIncomingPacket(int, int&, int&, int&);
+	bool markGotAnswer(int);
 };
 
 #endif
