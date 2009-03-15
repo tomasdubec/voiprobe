@@ -25,6 +25,7 @@ class LatencyComputer{
 	int soketka;
 	int key; //chared memory id
 	int *sharedLatency; //shared memory containing current value of latency
+	int packetsProcesed;
 
 	bool createSharedMem(void);
 public:
