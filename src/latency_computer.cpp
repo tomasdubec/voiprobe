@@ -1,11 +1,27 @@
 #include "latency_computer.h"
 
-LatencyComputer::LatencyComputer(string hst, int prt){
+/*
+ * @hst - other probe hostname
+ * @prt - other probe port
+ * @hs - histogram start
+ * @hc - histogram column count
+ * @cw - histogram column width
+ */
+LatencyComputer::LatencyComputer(string hst, int prt, int hs, int hc, int cw){
 	hostname = hst;
-	port = prt;
+	if(prt == -1)
+		port = 34567;
+	else
+		port = prt;
+
+	histStart = hs;
+	histEnd = hs + (hc * cw);
+	histStep = cw;
+	histUnderflowIndex = hc;
+	histOverflowIndex = hc + 1;
 
 	packetsProcesed = 0;
-	createSharedMem();
+	//createSharedMem();
 }
 
 LatencyComputer::~LatencyComputer(){
@@ -48,6 +64,28 @@ bool LatencyComputer::connectProbe(){
 	return true;
 }
 
+int LatencyComputer::round(double x){
+	return int(x + 0.5);
+}
+
+/*
+ * @l - latency in [us]
+ */
+void LatencyComputer::updateHistogram(int l){
+	double latency = (double)l / 1000.0;
+
+	if(latency < histStart){ //this latency is out of defined histogram
+		histogram[histUnderflowIndex]++;
+	}
+	else if(latency > histEnd){ //this latency is out of defined histogram
+		histogram[histOverflowIndex]++;
+	}
+	else{ //latency fits in histogram
+		int index = floor((double)((double)(latency - histStart) / (double)histStep));
+		histogram[index]++;
+	}
+}
+
 void LatencyComputer::start(){
 	int seqid, timestamp, realtime, ssrc, size, attempt = 0;
 	int rsid, rtimestamp, rrealtime, rssrc;
@@ -55,7 +93,7 @@ void LatencyComputer::start(){
 	vpPacket tmp;
 
 	while(true){
-		cout << "[*] connecting to second probe (" << attempt + 1 << ". attempt)...";
+		cout << "[i] connecting to second probe (" << attempt + 1 << ". attempt)...";
 		if(attempt < 3 && !connectProbe()){
 			cout << "failed\n";
 		}
@@ -70,9 +108,16 @@ void LatencyComputer::start(){
 		sleep(5);
 	}
 	
-	cout << "[*] latency computer connected to probe\n";
+	cout << "[i] latency computer connected to probe\n";
 
 	while(run){
+		if(packetsProcesed % 100 == 0 && packetsProcesed != 0){
+			cout << "[";
+			for(int i = 0; i < histOverflowIndex; i++){
+				cout << round((double)histogram[i] / (double)packetsProcesed * 100.0) << "%|";
+			}
+				cout << round((double)histogram[histOverflowIndex] / (double)packetsProcesed * 100.0) << "%]\n";
+		}
 		pthread_mutex_lock(&mtxDB);
 		if(db->getLatestOutgoingPacket(seqid, timestamp, realtime, ssrc)){
 			pthread_mutex_unlock(&mtxDB);
@@ -80,7 +125,7 @@ void LatencyComputer::start(){
 			tmp.version = 1;
 			tmp.time_shift = 0;
 			tmp.packet_number = htonl(seqid);
-			cout << "\t\t\t\t\trequesting seqid " << seqid << endl;
+			//cout << "\t\t\t\t\trequesting seqid " << seqid << endl;
 			if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
 				perror("LatencyComputer send error");
 				return;
@@ -91,11 +136,12 @@ void LatencyComputer::start(){
 			}
 			if(tmp.type == PACKET_REPLY){
 				rsid = ntohl(tmp.packet_number);
-				cout << "\t\t\t\t\tgot reply " << rsid << " (ts: " << (int32_t)ntohl(tmp.time_shift) << ")\n";
+				//cout << "\t\t\t\t\tgot reply " << rsid << " (ts: " << (int32_t)ntohl(tmp.time_shift) << ")\n";
 				pthread_mutex_lock(&mtxDB);
 				if(db->getIncomingPacket(rsid, rtimestamp, rrealtime, rssrc)){
 					packetsProcesed++;
 					latency = rrealtime - realtime + (int32_t)ntohl(tmp.time_shift);
+					updateHistogram(latency);
 					if(Latence == -1)
 						Latence = latency;
 					else
@@ -104,13 +150,12 @@ void LatencyComputer::start(){
 					if(!db->markGotAnswer(seqid)){
 						cerr << "error setting gotAnswer\n";
 					}
-
-					cout << "\t\t\t\t\t\t\t\tlatency: " << (double)latency / (double)1000 << "ms\n";
 				}
 				pthread_mutex_unlock(&mtxDB);
 			}
-			else if(tmp.type == PACKET_ERROR)
-				cout << "\t\t\t\t\treceived error\n";
+			else if(tmp.type == PACKET_ERROR){
+				//cout << "\t\t\t\t\treceived error\n";
+			}
 		}
 		else{
 			pthread_mutex_unlock(&mtxDB);
@@ -118,5 +163,4 @@ void LatencyComputer::start(){
 		}
 	}
 }
-
 

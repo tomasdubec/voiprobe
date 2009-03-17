@@ -1,17 +1,17 @@
 #include "snmp.h"
 
-void Snmp::init_vpLatency(void){
-	static oid vpLatency_oid[] = { 1, 3, 6, 1, 3, 200, 1, 0 };
-
-	netsnmp_register_read_only_int_instance("vpLatency", vpLatency_oid, OID_LENGTH(vpLatency_oid), &Latence, NULL);
-}
-
 Snmp::Snmp(){
 
 }
 
 Snmp::~Snmp(){
 
+}
+
+void Snmp::init_vpLatency(void){
+	static oid vpLatency_oid[] = { 1, 3, 6, 1, 3, 200, 1, 0 };
+
+	netsnmp_register_read_only_int_instance("vpLatency", vpLatency_oid, OID_LENGTH(vpLatency_oid), &Latence, NULL);
 }
 
 void Snmp::start(void){
@@ -24,10 +24,10 @@ void Snmp::start(void){
 	SOCK_STARTUP;
 
 	/* initialize the agent library */
-	init_agent("vpLatency");
+	init_agent("voiprobe");
 
 	/* mib code: init_nstAgentSubagentObject from nstAgentSubagentObject.C */
-	init_vpLatency();  
+	init_vpLatency();
 
 	/* example-demon will be used to read example-demon.conf files. */
 	init_snmp("voiprobe");

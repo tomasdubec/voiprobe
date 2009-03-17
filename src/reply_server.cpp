@@ -2,7 +2,10 @@
 
 ReplyServer::ReplyServer(string a, int p){
 	address = a;
-	port = p;
+	if(p == -1)
+		port = 34567;
+	else
+		port = p;
 }
 
 ReplyServer::~ReplyServer(){
@@ -56,7 +59,7 @@ void ReplyServer::start(){
 		return;
 	}
 
-	cout << "[*] second probe connected\n";
+	cout << "[i] accepted connection from second probe\n";
 
 	//reply to requests
 	while(run){
@@ -67,17 +70,17 @@ void ReplyServer::start(){
 		if(size > 0){
 			buf[size]='\0';
 			req = (vpPacket *)buf;
-			cout << "got request for " << ntohl(req->packet_number) << endl;
+			//cout << "got request for " << ntohl(req->packet_number) << endl;
 			if(req->type != PACKET_REQUEST)
 				continue;
 			
 			pthread_mutex_lock(&mtxDB);
 			if(db->getClosest(ntohl(req->packet_number), fid, timeshift)){
 				pthread_mutex_unlock(&mtxDB);
-				cout << "sending reply (ts: " << timeshift << ")\n";
+				//cout << "sending reply (ts: " << timeshift << ")\n";
 				//cout << "sending reply:\n\tseqid: " << fid << "\n\ttime shift: " << timeshift << endl;
 				int32_t test = ntohl(htonl(timeshift));
-				cout << "htonl(htonl(timeshift)): " << test << endl;
+				//cout << "htonl(htonl(timeshift)): " << test << endl;
 				tmp.type = PACKET_REPLY;
 				tmp.version = 1;
 				tmp.time_shift = htonl(timeshift);
@@ -89,7 +92,7 @@ void ReplyServer::start(){
 			}
 			else{
 				pthread_mutex_unlock(&mtxDB);
-				cout << "sending error\n";
+				//cout << "sending error\n";
 				tmp.type = PACKET_ERROR;
 				tmp.version = 1;
 				tmp.time_shift = 0;
@@ -101,7 +104,7 @@ void ReplyServer::start(){
 			}
 		}
 		else{
-			cout << "[*] reply server: client disconnected, quitting\n";
+			cout << "[+] reply server: client disconnected, quitting\n";
 			return;
 		}
 	}
