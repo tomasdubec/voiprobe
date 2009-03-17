@@ -1,6 +1,8 @@
 #include <sstream>
 #include <sqlite3.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <string.h>
 #include "packet_catcher.h"
 #include "reply_server.h"
 #include "latency_computer.h"
@@ -12,6 +14,8 @@ DB *db;
 pthread_mutex_t mtxDB = PTHREAD_MUTEX_INITIALIZER;
 int Latence;
 bool run;
+int histColWidth, histColumns, histStart;
+int *histogram;
 
 string itoa(int number){
 	stringstream s;
@@ -22,29 +26,29 @@ string itoa(int number){
 }
 
 void *runPacketCatcher(void *d){
-	PacketCatcher *pcatcher;
-	char **argv = (char **)d;
+	PacketCatcher *pcatcher = (PacketCatcher *)d;
+	//char **argv = (char **)d;
 
 	cout << "[*] packet catcher thread created\n";
-	pcatcher = new PacketCatcher(argv[1], argv[2], argv[3]);
-	//pcatcher = new PacketCatcher("eth1", "192.168.0.100", "192.168.0.55");
+	//pcatcher = new PacketCatcher(argv[1], argv[2], argv[3]);
 	pcatcher->start(true);
 
-	delete pcatcher;
+	//delete pcatcher;
 
-	cout << "[*] packet catcher thread quitting\n";
+	cout << "[+] packet catcher thread quitting\n";
 }
 
 void *runReplyServer(void *d){
 	ReplyServer *rs;
+	int port = *(int*)d;
 
 	cout << "[*] reply server thread created\n";
-	rs = new ReplyServer();
+	rs = new ReplyServer("", port);
 	rs->start();
 
 	delete rs;
 
-	cout << "[*] reply server thread quitting\n";
+	cout << "[+] reply server thread quitting\n";
 }
 
 void *runSnmpServer(void *d){
@@ -56,11 +60,22 @@ void *runSnmpServer(void *d){
 
 	delete s;
 
-	cout << "[*] snmp server thread quitting\n";
+	cout << "[+] snmp server thread quitting\n";
 }
 
-void usage(void){
-	cout << "usage: voiprobe interface my_client_IP other_client_IP other_probe_IP other_probe_port" << endl;
+void usage(string myname){
+	cout << "usage: " << myname << " [options]" << endl;
+	cout << "where options are:\n";
+	cout << "\t-i interface_name\t set interface on which to sniff packets (*)\n";
+	cout << "\t-m hostname\t\t of my client (*)\n";
+	cout << "\t-r hostname\t\t of remote client (*)\n";
+	cout << "\t-s ip_addr\t\t IP address of the other probe (*)\n";
+	cout << "\t-p port\t\t\t port on which the other probe listens (default: 34567)\n";
+	cout << "\t-l port\t\t\t port on which to listen for connection from the other probe (default: 34567)\n";
+	cout << "\t-c number\t\t histogram column width in [ms] (default: 1ms)\n";
+	cout << "\t-n number\t\t number of columns in histogram (default: 20)\n";
+	cout << "\t-b number\t\t starting time of histogram in [ms] (default: 1ms)\n";
+	cout << "\noptions marked (*) are mandatory and must be set!\n";
 }
 
 int main(int argc, char **argv){
@@ -68,19 +83,65 @@ int main(int argc, char **argv){
 	pthread_t thrReply;
 	pthread_t thrSnmp;
 	LatencyComputer *lc;
+	char c;
+	string myClient, remoteClient, probeIP, interface;
+	int probePort, listenPort;
 
+	histColWidth = histColumns = histStart = -1;
+	myClient = remoteClient = probeIP = interface = "";
+	probePort = listenPort = -1;
 	Latence = -1;
 	run = true;
 
-	if(argc < 5){
-		usage();
+	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:")) != -1){
+		switch(c){
+		case 'i':
+			interface = optarg;
+			break;
+		case 'm':
+			myClient = optarg;
+			break;
+		case 'r':
+			remoteClient = optarg;
+			break;
+		case 's':
+			probeIP = optarg;
+			break;
+		case 'p':
+			probePort = atoi(optarg);
+			break;
+		case 'l':
+			listenPort = atoi(optarg);
+			break;
+		case 'c':
+			histColWidth = atoi(optarg);
+			break;
+		case 'n':
+			histColumns = atoi(optarg);
+			break;
+		case 'b':
+			histStart = atoi(optarg);
+			break;
+		case '?':
+			usage(argv[0]);
+			exit(0);
+		}
+	}
+	if(myClient == "" || remoteClient == "" || probeIP == "" || interface == ""){
+		usage(argv[0]);
 		exit(0);
 	}
+	if(histColWidth == -1) histColWidth = 1;
+	if(histColumns == -1) histColumns = 20;
+	if(histStart == -1) histStart = 1;
+	cout << "[i] histogram: from " << histStart << "ms to " << histStart + (histColumns * histColWidth)<< "ms with " << histColWidth << "ms steps\n";
+	histogram = new int[histColumns + 2];
+	memset(histogram, 0, (histColumns + 2) * sizeof(int));
 
-	if(sqlite3_threadsafe() != 1){
+	/*if(sqlite3_threadsafe() != 1){
 		cerr << "voiprobe needs SQLite library to be compiled with SQLITE_THREADSAFE set to 1 (serialized). SQLite library on this system is compiled with SQLITE_THREADSAFE == " << sqlite3_threadsafe() << ".\n";
 		exit(-1);
-	}
+	}*/
 	// this interface is experimental and not included in current stable versions of sqlite. but maybe one day... 
 	/*if(sqlite3_threadsafe() != 1){
 		sqlite3_config(SQLITE_CONFIG_SERIALIZED);
@@ -91,14 +152,18 @@ int main(int argc, char **argv){
 		exit(-1);
 	}*/
 
-	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, (void*)argv) != 0){
+	PacketCatcher pcatcher(interface, myClient, remoteClient);
+
+	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, (void*)(&pcatcher)) != 0){
 		cerr << "unable to create packet catcher thread!\n";
 		exit(-1);
 	}
-	if(pthread_create(&thrReply, NULL, runReplyServer, NULL) != 0){
+
+	if(pthread_create(&thrReply, NULL, runReplyServer, (void*)(&listenPort)) != 0){
 		cerr << "unable to create reply server thread!\n";
 		exit(-1);
 	}
+
 	if(pthread_create(&thrSnmp, NULL, runSnmpServer, NULL) != 0){
 		cerr << "unable to create snmp server thread!\n";
 		exit(-1);
@@ -106,16 +171,18 @@ int main(int argc, char **argv){
 
 	cout << "[*] latency computer thread created\n";
 
-	lc = new LatencyComputer(argv[4], atoi(argv[5]));
+	lc = new LatencyComputer(probeIP, probePort, histStart, histColumns, histColWidth);
 	lc->start();
 
 	delete lc;
 
-	cout << "[*] latency computer thread quitting\n";
+	cout << "[+] latency computer thread quitting\n";
 
 	pthread_join(thrCatcher, NULL);
 	pthread_join(thrReply, NULL);
+	pthread_join(thrSnmp, NULL);
 
+	delete [] histogram;
 	delete db;
 
 	return 0;

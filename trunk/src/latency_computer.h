@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <string.h>
+#include <math.h>
 #include "mypacket.h"
 #include "db.h"
 
@@ -17,6 +18,7 @@ extern DB *db;
 extern pthread_mutex_t mtxDB;
 extern int Latence;
 extern bool run;
+extern int *histogram;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;
@@ -27,9 +29,13 @@ class LatencyComputer{
 	int *sharedLatency; //shared memory containing current value of latency
 	int packetsProcesed;
 
+	int histStart, histEnd, histStep, histUnderflowIndex, histOverflowIndex; //histogram parameters
+
 	bool createSharedMem(void);
+	void updateHistogram(int);
+	int round(double);
 public:
-	LatencyComputer(string, int);
+	LatencyComputer(string, int, int, int, int);
 	~LatencyComputer();
 	void start();
 	bool connectProbe();
