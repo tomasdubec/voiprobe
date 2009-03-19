@@ -26,6 +26,10 @@ bool DB::insertOutgoingPacket(int seqn, int timestamp, int realtime, int ssrc){
 
 	outgoingPackets.push_front(p);
 
+	while(outgoingPackets.size() > 100){
+		outgoingPackets.pop_back();
+	}
+
 	return true;
 }
 
@@ -40,6 +44,10 @@ bool DB::insertIncomingPacket(int seqn, int timestamp, int realtime, int ssrc){
 
 	incomingPackets.push_back(p);
 
+	while(incomingPackets.size() > 100){
+		incomingPackets.pop_front();
+	}
+
 	return true;
 }
 
@@ -52,7 +60,12 @@ bool DB::getLatestOutgoingPacket(int &sid, int &ts, int &rt, int &ss){
 	/*outgoingPackets.sort();
 	outgoingPackets.reverse();*/
 
+	if(outgoingPackets.size() < 6)
+		return false;
+
 	it = outgoingPackets.begin();
+	it++;it++;it++;it++;
+
 	if(!it->gotAnswer){
 		sid = it->seqid;
 		ts = it->timestamp;
@@ -164,7 +177,7 @@ bool DB::getClosest(int id, int &fid, int32_t &ts){
 			last.gotAnswer = it->gotAnswer;
 		}
 	}
-	//we didn't find older, but list is not empty, so last contains closest packet
+	//we didn't find older, but list is not empty, so 'last' contains closest packet
 	fid = last.seqid;
 	ts = main.realtime - last.realtime;
 	

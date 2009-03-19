@@ -111,13 +111,13 @@ void LatencyComputer::start(){
 	cout << "[i] latency computer connected to probe\n";
 
 	while(run){
-		if(packetsProcesed % 100 == 0 && packetsProcesed != 0){
+		/*if(packetsProcesed % 100 == 0 && packetsProcesed != 0){
 			cout << "[";
 			for(int i = 0; i < histOverflowIndex; i++){
 				cout << round((double)histogram[i] / (double)packetsProcesed * 100.0) << "%|";
 			}
 				cout << round((double)histogram[histOverflowIndex] / (double)packetsProcesed * 100.0) << "%]\n";
-		}
+		}*/
 		pthread_mutex_lock(&mtxDB);
 		if(db->getLatestOutgoingPacket(seqid, timestamp, realtime, ssrc)){
 			pthread_mutex_unlock(&mtxDB);
