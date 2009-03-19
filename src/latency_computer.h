@@ -19,6 +19,7 @@ extern pthread_mutex_t mtxDB;
 extern int Latence;
 extern bool run;
 extern int *histogram;
+extern int packetsProcesed;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;
@@ -27,7 +28,6 @@ class LatencyComputer{
 	int soketka;
 	int key; //chared memory id
 	int *sharedLatency; //shared memory containing current value of latency
-	int packetsProcesed;
 
 	int histStart, histEnd, histStep, histUnderflowIndex, histOverflowIndex; //histogram parameters
 

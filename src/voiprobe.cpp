@@ -16,6 +16,8 @@ int Latence;
 bool run;
 int histColWidth, histColumns, histStart;
 int *histogram;
+string *legend;
+int packetsProcesed;
 
 string itoa(int number){
 	stringstream s;
@@ -52,10 +54,10 @@ void *runReplyServer(void *d){
 }
 
 void *runSnmpServer(void *d){
-	Snmp *s;
+	Snmp *s = (Snmp*)d;
 
 	cout << "[*] snmp server thread created\n";
-	s = new Snmp();
+	//s = new Snmp();
 	s->start();
 
 	delete s;
@@ -135,7 +137,8 @@ int main(int argc, char **argv){
 	if(histColumns == -1) histColumns = 20;
 	if(histStart == -1) histStart = 1;
 	cout << "[i] histogram: from " << histStart << "ms to " << histStart + (histColumns * histColWidth)<< "ms with " << histColWidth << "ms steps\n";
-	histogram = new int[histColumns + 2];
+	histogram = new int[histColumns + 3];
+	histogram[histColumns + 2] = -1;
 	memset(histogram, 0, (histColumns + 2) * sizeof(int));
 
 	/*if(sqlite3_threadsafe() != 1){
@@ -164,7 +167,8 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
-	if(pthread_create(&thrSnmp, NULL, runSnmpServer, NULL) != 0){
+	Snmp s(histStart, histColumns, histColWidth);
+	if(pthread_create(&thrSnmp, NULL, runSnmpServer, (void*)(&s)) != 0){
 		cerr << "unable to create snmp server thread!\n";
 		exit(-1);
 	}
