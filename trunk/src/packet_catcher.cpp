@@ -77,6 +77,7 @@ void PacketCatcher::start(bool adapt){
 	struct timeval cas;
 	int start_time;
 	long realtime;
+	int lastTS = -1, lastRT = -1; //last timestamp and last realtime for jitter calculation
 
 	setFilter(shost, dhost);
 
@@ -103,7 +104,7 @@ void PacketCatcher::start(bool adapt){
 
 		Packet p(packet, header.len);
 
-		if(getStrIP(p.getSHost()) == shost){
+		if(getStrIP(p.getSHost()) == shost){ // outgoing packet
 			if(!ocapture){//we haven't find the begining of outgoing traffic yet
 				if(p.getMarker() && p.getTimestamp() == 0){
 					ocapture = true;
@@ -118,7 +119,7 @@ void PacketCatcher::start(bool adapt){
 				db->insertOutgoingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
 			}
 		}
-		else{
+		else{ //incoming packet
 			if(!icapture){//we haven't find the begining of incoming traffic yet
 				if(p.getMarker() && p.getTimestamp() == 0){
 					icapture = true;
@@ -131,6 +132,22 @@ void PacketCatcher::start(bool adapt){
 			if(issrc_lock == p.getSsrc()){ //it is a packet from our stream
 				//cout << "incoming packet:" << endl;
 				db->insertIncomingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
+
+				//count jitter
+				if(lastTS != -1 && lastRT != -1){
+					int dif = abs((realtime - lastRT) - ((p.getTimestamp() - lastTS) / 16 * 1000));
+					//jitter = (double)jitter * 0.99 + 0.01*(double)dif;
+					/*if(dif > 100000 || dif < 0){
+						cout << "error, analysis: (" << p.getSeqNum() << ")\n";
+						cout << "\trealtime: " << realtime << "\n\tlastRT: " << lastRT << "\n\tp.getTimestamp(): " << p.getTimestamp() << "\n\tlastTS: " << lastTS << endl;
+						cout << "\t(realtime - lastRT): " << (realtime - lastRT) << endl;
+						cout << "\t(p.getTimestamp() - lastTS) / 16 * 1000: " << (p.getTimestamp() - lastTS) / 16 * 1000 << endl;
+						cout << "\tdif: " << dif << endl;
+					}*/
+					jitter = jitter + dif - jitter / 16;
+				}
+				lastTS = p.getTimestamp();
+				lastRT = realtime;
 			}
 		}
 
