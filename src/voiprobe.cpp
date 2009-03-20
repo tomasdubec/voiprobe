@@ -18,6 +18,7 @@ int histColWidth, histColumns, histStart;
 int *histogram;
 string *legend;
 int packetsProcesed;
+int jitter;
 
 string itoa(int number){
 	stringstream s;

@@ -20,6 +20,7 @@ extern int Latence;
 extern bool run;
 extern int *histogram;
 extern int packetsProcesed;
+extern int jitter;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;
