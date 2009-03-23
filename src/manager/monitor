@@ -1,0 +1,145 @@
+#!/bin/bash
+
+function header(){
+	echo "<html>
+	<head>
+		<style>
+			img{
+				border: none;
+			}
+			body{
+				padding: 10px;
+				font-family: Courier;
+				background: #aaa;
+			}
+			table{
+				height: 100px;
+				border-collapse: collapse;
+			}
+			td{
+				text-align: center;
+				vertical-align: bottom;
+				margin: 0px;
+				padding: 0px;
+				font-size: 8px;
+				border: 1px dotted #ababab;
+				border-top: 0px;
+				border-bottom: 0px;
+				background: url('bg.png');
+			}
+			.dolni-osa{
+				/*padding-top: 1px;*/
+				background: white;
+				border: none;
+			}
+			.bocni-osa{
+				/*padding-right: 1px;*/
+				background: white;
+				border: none;
+			}
+			.labely{
+				vertical-align: top;
+				font-size: 14px;
+				text-align: right;
+				font-family: arial;
+				background: #aaa;
+				border: none;
+			}
+			.labelx{
+				font-size: 10px;
+				vertical-align: top;
+				padding: 0px 2px;
+				background: #aaa;
+				border: none;
+			}
+			.ramecek{
+				border: 1px outset #888;
+				background: #aaa;
+				padding: 10px;
+			}
+			.roh{
+				border: none;
+				padding: 0px;
+				margin: 0px;
+			}
+		</style>
+	</head>
+	<body>" > $1
+}
+
+function footer(){
+	echo "	</body>
+</html>" >> $1
+}
+
+if [ $# -lt 2 ]; then
+	echo "usage: $0 hostname outputfile"
+	exit
+fi
+
+count=0
+go=1
+bw=2 #border width
+packets=0
+
+echo -n "waiting for monitoring to start"
+while [ $packets == 0 ]; do
+	packets=`snmpget -v2c -c public $1 vpPacketsProcesed.0 | cut -d':' -f4 | sed s/' '//g`
+	echo -n "."
+	sleep 1
+done
+echo "there we go"
+
+while [ 1 == 1 ]; do
+	packets=`snmpget -v2c -c public $1 vpPacketsProcesed.0 | cut -d':' -f4 | sed s/' '//g`
+	echo -n "loading histogram size and data"
+	count=0
+	while [ $go == 1 ]; do
+		tmp=`snmpget -v2c -c public $1 packetCount.$count`
+		if [ "`echo $tmp | cut -d':' -f4`" == "" ]; then 
+			break
+		fi
+		value[$count]=`echo $tmp | cut -d':' -f4 | sed s/' '//g`
+		tmp=`snmpget -v2c -c public $1 latencyInterval.$count`
+		label[$count]=`echo $tmp | cut -d':' -f4 | cut -d'"' -f2 | sed s/' '//g`
+		count=$(($count+1))
+		echo -n "."
+	done
+	echo $count
+
+	header $2
+
+	echo -n "writing html"
+	echo "<h1>Latency histogram</h1>" >> $2
+	echo "<p class=\"ramecek\"><table><tr>" >> $2
+	echo "<td class=\"labely\">100%</td><td class=\"bocni-osa\"><img src=\"black.png\" width=\"$bw\" height=\"200\" /></td>" >> $2
+	for((a=0;$a<$count;a=$(($a+1)))); do
+		echo "		<td>$((${value[$a]} * 100 / $packets))%<br/><img src=\"color.png\" width=\"20\" height=\"$((${value[$a]} * 200 / $packets))\" />" >> $2
+		echo -n "."
+	done
+	echo "<td></td></tr><tr><td class=\"labely\"></td><td class=\"roh\"><img src=\"black.png\" width=\"$(($bw+1))\" height=\"$(($bw+1))\" /></td><td class=\"dolni-osa\" colspan=\"$(($count + 1))\"><img src=\"black.png\" width=\"100%\" height=\"$bw\" /></td>" >> $2
+	echo "</tr><tr><td class=\"labely\">0%</td><td class=\"labely\"></td>" >> $2
+
+	for((a=0;$a<$count;a=$(($a+1)))); do
+		if [ "${label[$a]}" == "underflow" ]; then
+			label[$a]="under"
+		fi
+		if [ "${label[$a]}" == "overflow" ]; then
+			label[$a]="over"
+		fi
+		echo "<td class=\"labelx\">${label[$a]}</td>" >> $2
+	done
+	echo "<td class=\"labelx\">[ms]</td>" >> $2
+	echo "</tr></table></p><br />" >> $2
+	echo "<h1>Latency</h1>" >> $2
+	echo "<table><tr><td>" >> $2
+	echo "<img class=\"ramecek\" src=\"latency.png\" />" >> $2
+	echo "</td></tr></table>" >> $2
+
+	echo "done"
+
+	footer $2
+
+	sleep 5
+done
+

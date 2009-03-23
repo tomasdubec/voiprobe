@@ -1,0 +1,40 @@
+#!/bin/bash
+
+start=0
+
+function create_rrd(){
+	rrdtool create latency.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:0.5:2:600
+}
+
+function update_rrd(){
+	tmp=`snmpget -v2c -c public $1 vpLatency.0 | cut -d':' -f4 | sed s/' '//g`
+	echo $tmp
+	rrdtool update latency.rrd `date +%s`:$tmp
+}
+
+function graph_rrd(){
+	rrdtool graph latency.png --start $((`date +%s` - 600)) --end `date +%s` --vertical-label us DEF:latency=latency.rrd:latency:LAST LINE1:latency#00aa00 &> /dev/null
+}
+
+start=`date +%s`
+packets=0
+
+create_rrd
+sleep 1
+
+echo -n "waiting for monitoring to start"
+while [ $packets == 0 ]; do
+	packets=`snmpget -v2c -c public $1 vpPacketsProcesed.0 | cut -d':' -f4 | sed s/' '//g`
+	echo -n "."
+	sleep 1
+done
+echo "there we go"
+
+while [ 1 == 1 ]; do
+	update_rrd $1
+	if [ $((`date +%s` % 10)) == 0 ]; then
+		graph_rrd
+	fi
+	sleep 1
+done
+
