@@ -62,7 +62,33 @@ function header(){
 				padding: 0px;
 				margin: 0px;
 			}
+			.clear{
+				background: transparent;
+			}
+			.count{
+				display: none;
+			}
 		</style>
+		<script>
+			visible = false;
+			function countVisibility(){
+				if (!document.styleSheets) return;
+				var theRules = new Array();
+				if (document.styleSheets[0].cssRules)
+					theRules = document.styleSheets[0].cssRules
+				else if (document.styleSheets[0].rules)
+					theRules = document.styleSheets[0].rules
+				else return;
+				if(visible){
+					theRules[theRules.length-1].style.display = 'none';
+					visible=false;
+				}
+				else{
+					theRules[theRules.length-1].style.display = 'block';
+					visible=true;
+				}
+			}
+		</script>
 	</head>
 	<body>" > $1
 }
@@ -114,7 +140,7 @@ while [ 1 == 1 ]; do
 	echo "<p class=\"ramecek\"><table><tr>" >> $2
 	echo "<td class=\"labely\">100%</td><td class=\"bocni-osa\"><img src=\"black.png\" width=\"$bw\" height=\"200\" /></td>" >> $2
 	for((a=0;$a<$count;a=$(($a+1)))); do
-		echo "		<td>$((${value[$a]} * 100 / $packets))%<br/><img src=\"color.png\" width=\"20\" height=\"$((${value[$a]} * 200 / $packets))\" />" >> $2
+		echo "		<td>$((${value[$a]} * 100 / $packets))%<br/><div class=\"count\" id=\"count\">${value[$a]}</div><img src=\"color.png\" width=\"20\" height=\"$((${value[$a]} * 200 / $packets))\" />" >> $2
 		echo -n "."
 	done
 	echo "<td></td></tr><tr><td class=\"labely\"></td><td class=\"roh\"><img src=\"black.png\" width=\"$(($bw+1))\" height=\"$(($bw+1))\" /></td><td class=\"dolni-osa\" colspan=\"$(($count + 1))\"><img src=\"black.png\" width=\"100%\" height=\"$bw\" /></td>" >> $2
@@ -131,9 +157,14 @@ while [ 1 == 1 ]; do
 	done
 	echo "<td class=\"labelx\">[ms]</td>" >> $2
 	echo "</tr></table></p><br />" >> $2
-	echo "<h1>Latency</h1>" >> $2
-	echo "<table><tr><td>" >> $2
+	echo "<a href=\"javascript:countVisibility()\">show absolute counts</a>" >> $2
+	echo "<h1>Latency last 10 minutes</h1>" >> $2
+	echo "<table><tr><td class=\"clear\">" >> $2
 	echo "<img class=\"ramecek\" src=\"latency.png\" />" >> $2
+	echo "</td></tr></table>" >> $2
+	echo "<h1>Latency last hour</h1>" >> $2
+	echo "<table><tr><td class=\"clear\">" >> $2
+	echo "<img class=\"ramecek\" src=\"latency3600.png\" />" >> $2
 	echo "</td></tr></table>" >> $2
 
 	echo "done"
