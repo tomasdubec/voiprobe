@@ -116,7 +116,9 @@ void PacketCatcher::start(bool adapt){
 			}
 			if(ossrc_lock == p.getSsrc()){ //it is a packet from our stream
 				//cout << "outgoing packet:" << endl;
+				pthread_mutex_lock(&mtxDB);
 				db->insertOutgoingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
+				pthread_mutex_unlock(&mtxDB);
 			}
 		}
 		else{ //incoming packet
@@ -131,7 +133,9 @@ void PacketCatcher::start(bool adapt){
 			}
 			if(issrc_lock == p.getSsrc()){ //it is a packet from our stream
 				//cout << "incoming packet:" << endl;
+				pthread_mutex_lock(&mtxDB);
 				db->insertIncomingPacket(p.getSeqNum(), p.getTimestamp(), realtime, p.getSsrc());
+				pthread_mutex_unlock(&mtxDB);
 
 				//count jitter
 				if(lastTS != -1 && lastRT != -1){

@@ -135,6 +135,7 @@ bool DB::getClosest(int id, int &fid, int32_t &ts){
 	__packet last, main;
 	list<__packet>::iterator it;
 
+
 	if(outgoingPackets.empty())
 		return false;
 
