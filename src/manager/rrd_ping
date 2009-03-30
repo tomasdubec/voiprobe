@@ -1,0 +1,18 @@
+#!/bin/bash
+
+start=`date +%s`
+
+rrdtool create ping.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:0.5:2:3600 RRA:AVERAGE:0.5:5:3600
+
+cnt=0
+
+while [ 1 == 1 ]; do
+	tm=`ping -c 1 t23 | grep "time=" | cut -d'=' -f4 | cut -d' ' -f1`
+	rrdtool update ping.rrd `date +%s`:$tm
+	cnt=$(($cnt+1))
+	if [ $(($cnt % 10)) == 0 ]; then
+		rrdtool graph ping600.png  --start $((`date +%s` - 600))  --end `date +%s` --vertical-label ms DEF:latency=ping.rrd:latency:LAST    LINE1:latency#00ffff &> /dev/null
+		rrdtool graph ping3600.png --start $((`date +%s` - 3600)) --end `date +%s` --vertical-label ms DEF:latency=ping.rrd:latency:AVERAGE LINE1:latency#00ffff &> /dev/null
+	fi
+	sleep 1
+done

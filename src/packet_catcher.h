@@ -17,6 +17,7 @@ extern DB *db;
 extern pthread_mutex_t mtxDB;
 extern bool run;
 extern int jitter;
+extern int jitter1;
 
 class PacketCatcher{
 	pcap_t *pcap_handle;
