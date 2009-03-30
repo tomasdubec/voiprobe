@@ -139,16 +139,18 @@ void PacketCatcher::start(bool adapt){
 
 				//count jitter
 				if(lastTS != -1 && lastRT != -1){
-					int dif = abs((realtime - lastRT) - ((p.getTimestamp() - lastTS) / 16 * 1000));
-					//jitter = (double)jitter * 0.99 + 0.01*(double)dif;
-					/*if(dif > 100000 || dif < 0){
-						cout << "error, analysis: (" << p.getSeqNum() << ")\n";
-						cout << "\trealtime: " << realtime << "\n\tlastRT: " << lastRT << "\n\tp.getTimestamp(): " << p.getTimestamp() << "\n\tlastTS: " << lastTS << endl;
-						cout << "\t(realtime - lastRT): " << (realtime - lastRT) << endl;
-						cout << "\t(p.getTimestamp() - lastTS) / 16 * 1000: " << (p.getTimestamp() - lastTS) / 16 * 1000 << endl;
-						cout << "\tdif: " << dif << endl;
-					}*/
-					jitter = jitter + dif - jitter / 16;
+					int dif = abs((realtime - lastRT) - (((p.getTimestamp() - lastTS) / 16) * 1000)); //dif v us
+					int dif1 = abs((((realtime - lastRT) * 16) / 1000) - (p.getTimestamp() - lastTS)); //dif v rtp jednotkach
+
+					/*cout << "---------------------------------------------------------------\n";
+					cout << "\trealtime: " << realtime << "\n\tlastRT: " << lastRT << "\n\tp.getTimestamp(): " << p.getTimestamp() << "\n\tlastTS: " << lastTS << endl;
+					cout << "\t(realtime - lastRT): " << (realtime - lastRT) << endl;
+					cout << "\t(p.getTimestamp() - lastTS) / 16 * 1000: " << (p.getTimestamp() - lastTS) / 16 * 1000 << endl;
+					cout << "\tdif: " << dif << endl;*/
+
+					jitter = (0.99 * (double)jitter) + (0.01 * (double)dif); //jitter
+					//jitter1 = (jitter1) * 0.9 + ((double)(jitter1 + ((dif - jitter1) / 16))) * 0.1; //jitter dle rfc1889
+					jitter1 = jitter1 + ((double)(dif1 - jitter1) / 16.0); //jitter dle rfc1889
 				}
 				lastTS = p.getTimestamp();
 				lastRT = realtime;

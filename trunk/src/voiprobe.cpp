@@ -18,7 +18,7 @@ int histColWidth, histColumns, histStart;
 int *histogram;
 string *legend;
 int packetsProcesed;
-int jitter;
+int jitter, jitter1;
 
 string itoa(int number){
 	stringstream s;
@@ -94,6 +94,7 @@ int main(int argc, char **argv){
 	myClient = remoteClient = probeIP = interface = "";
 	probePort = listenPort = -1;
 	Latence = -1;
+	jitter = jitter1 = 0;
 	run = true;
 
 	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:")) != -1){

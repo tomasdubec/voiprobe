@@ -158,14 +158,44 @@ while [ 1 == 1 ]; do
 	echo "<td class=\"labelx\">[ms]</td>" >> $2
 	echo "</tr></table></p><br />" >> $2
 	echo "<a href=\"javascript:countVisibility()\">show absolute counts</a>" >> $2
+
+	echo "<table><tr><td class=\"clear\">" >> $2
 	echo "<h1>Latency last 10 minutes</h1>" >> $2
-	echo "<table><tr><td class=\"clear\">" >> $2
 	echo "<img class=\"ramecek\" src=\"latency.png\" />" >> $2
-	echo "</td></tr></table>" >> $2
+	echo "</td><td class=\"clear\">&nbsp;&nbsp;&nbsp;" >> $2
+	echo "</td><td class=\"clear\">" >> $2
 	echo "<h1>Latency last hour</h1>" >> $2
-	echo "<table><tr><td class=\"clear\">" >> $2
 	echo "<img class=\"ramecek\" src=\"latency3600.png\" />" >> $2
-	echo "</td></tr></table>" >> $2
+	echo "</td></tr></table><br />" >> $2
+
+	if [ -e ping600.png ]; then
+		echo "<table><tr><td class=\"clear\">" >> $2
+		echo "<h1>ping 10 minutes</h1>" >> $2
+		echo "<img class=\"ramecek\" src=\"ping600.png\" />" >> $2
+		echo "</td><td class=\"clear\">&nbsp;&nbsp;&nbsp;" >> $2
+		echo "</td><td class=\"clear\">" >> $2
+		echo "<h1>ping last hour</h1>" >> $2
+		echo "<img class=\"ramecek\" src=\"ping3600.png\" />" >> $2
+		echo "</td></tr></table><br />" >> $2
+	fi
+
+	echo "<table><tr><td class=\"clear\">" >> $2
+	echo "<h1>Jitter last 10 minutes</h1>" >> $2
+	echo "<img class=\"ramecek\" src=\"jitter600.png\" />" >> $2
+	echo "</td><td class=\"clear\">&nbsp;&nbsp;&nbsp;" >> $2
+	echo "</td><td class=\"clear\">" >> $2
+	echo "<h1>Jitter last hour</h1>" >> $2
+	echo "<img class=\"ramecek\" src=\"jitter3600.png\" />" >> $2
+	echo "</td></tr></table><br />" >> $2
+
+	echo "<table><tr><td class=\"clear\">" >> $2
+	echo "<h1>RTP Jitter last 10 minutes</h1>" >> $2
+	echo "<img class=\"ramecek\" src=\"rtpjitter600.png\" />" >> $2
+	echo "</td><td class=\"clear\">&nbsp;&nbsp;&nbsp;" >> $2
+	echo "</td><td class=\"clear\">" >> $2
+	echo "<h1>RTP Jitter last hour</h1>" >> $2
+	echo "<img class=\"ramecek\" src=\"rtpjitter3600.png\" />" >> $2
+	echo "</td></tr></table><br />" >> $2
 
 	echo "done"
 

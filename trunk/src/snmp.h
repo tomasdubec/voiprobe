@@ -19,6 +19,7 @@ extern int packetsProcesed;
 extern string *legend;
 extern string itoa(int);
 extern int jitter;
+extern int jitter1;
 
 struct vpLatencyHistogramTable_entry{
     char            latencyInterval[50];
@@ -33,6 +34,7 @@ class Snmp{
 
 	void init_vpLatency(void);
 	void init_vpJitter(void);
+	void init_vpRTPJitter(void);
 	void init_vpPacketsProcesed(void);
 	void init_vpLatencyHistogramTable(void);
 

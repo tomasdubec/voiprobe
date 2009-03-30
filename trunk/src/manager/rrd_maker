@@ -3,18 +3,32 @@
 start=0
 
 function create_rrd(){
-	rrdtool create latency.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:0.5:2:3600
+	rrdtool create latency.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:0.5:2:3600 RRA:AVERAGE:0.5:5:3600
+	rrdtool create jitter.rrd  --start $start DS:jitter:GAUGE:2:U:U  --step 2 RRA:LAST:0.5:2:3600 RRA:AVERAGE:0.5:5:3600
+	rrdtool create rtpjitter.rrd  --start $start DS:rtpjitter:GAUGE:2:U:U  --step 2 RRA:LAST:0.5:2:3600 RRA:AVERAGE:0.5:5:3600
 }
 
 function update_rrd(){
 	tmp=`snmpget -v2c -c public $1 vpLatency.0 | cut -d':' -f4 | sed s/' '//g`
-	echo $tmp
+#	echo $tmp
 	rrdtool update latency.rrd `date +%s`:$tmp
+	tmp=`snmpget -v2c -c public $1 vpJitter.0  | cut -d':' -f4 | sed s/' '//g`
+#	echo $tmp
+	rrdtool update jitter.rrd  `date +%s`:$tmp
+	tmp=`snmpget -v2c -c public $1 vpRTPJitter.0  | cut -d':' -f4 | sed s/' '//g`
+#	echo $tmp
+	rrdtool update rtpjitter.rrd  `date +%s`:$tmp
 }
 
 function graph_rrd(){
-	rrdtool graph latency.png --start $((`date +%s` - 600)) --end `date +%s` --vertical-label us DEF:latency=latency.rrd:latency:LAST LINE1:latency#00aa00 &> /dev/null
-	rrdtool graph latency3600.png --start $((`date +%s` - 3600)) --end `date +%s` --vertical-label us DEF:latency=latency.rrd:latency:LAST LINE1:latency#00aa00 &> /dev/null
+	rrdtool graph latency.png     --start $((`date +%s` - 600))  --end `date +%s` --vertical-label us DEF:latency=latency.rrd:latency:LAST LINE1:latency#00ff00 &> /dev/null
+	rrdtool graph latency3600.png --start $((`date +%s` - 3600)) --end `date +%s` --vertical-label us DEF:latency=latency.rrd:latency:AVERAGE LINE1:latency#00ff00 &> /dev/null
+
+	rrdtool graph jitter600.png   --start $((`date +%s` - 600))  --end `date +%s` --vertical-label us DEF:jitter=jitter.rrd:jitter:LAST LINE1:jitter#ff0000 &> /dev/null
+	rrdtool graph jitter3600.png  --start $((`date +%s` - 3600)) --end `date +%s` --vertical-label us DEF:jitter=jitter.rrd:jitter:AVERAGE LINE1:jitter#ff0000 &> /dev/null
+
+	rrdtool graph rtpjitter600.png   --start $((`date +%s` - 600))  --end `date +%s` DEF:rtpjitter=rtpjitter.rrd:rtpjitter:LAST LINE1:rtpjitter#0000ff &> /dev/null
+	rrdtool graph rtpjitter3600.png  --start $((`date +%s` - 3600)) --end `date +%s` DEF:rtpjitter=rtpjitter.rrd:rtpjitter:AVERAGE LINE1:rtpjitter#0000ff &> /dev/null
 }
 
 start=`date +%s`

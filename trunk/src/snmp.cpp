@@ -104,8 +104,14 @@ void Snmp::init_vpJitter(void){
 	netsnmp_register_read_only_int_instance("vpJitter", vpJitter_oid, OID_LENGTH(vpJitter_oid), &jitter, NULL);
 }
 
+void Snmp::init_vpRTPJitter(void){
+	static oid vpJitter_oid[] = { 1, 3, 6, 1, 3, 200, 4, 0 };
+
+	netsnmp_register_read_only_int_instance("vpJitter", vpJitter_oid, OID_LENGTH(vpJitter_oid), &jitter1, NULL);
+}
+
 void Snmp::init_vpLatencyHistogramTable(void){
-	static oid vpLatencyHistogramTable_oid[] = { 1, 3, 6, 1, 3, 200, 4 };
+	static oid vpLatencyHistogramTable_oid[] = { 1, 3, 6, 1, 3, 200, 5 };
 	size_t vpLatencyHistogramTable_oid_len = OID_LENGTH(vpLatencyHistogramTable_oid);
 	netsnmp_handler_registration *reg;
 	netsnmp_iterator_info *iinfo;
@@ -141,6 +147,7 @@ void Snmp::start(void){
 	/* mib code: init_nstAgentSubagentObject from nstAgentSubagentObject.C */
 	init_vpLatency();
 	init_vpJitter();
+	init_vpRTPJitter();
 	init_vpPacketsProcesed();
 	init_vpLatencyHistogramTable();
 
