@@ -26,7 +26,7 @@ bool DB::insertOutgoingPacket(int seqn, int timestamp, int realtime, int ssrc){
 
 	outgoingPackets.push_front(p);
 
-	while(outgoingPackets.size() > 100){
+	while(outgoingPackets.size() > 300){
 		outgoingPackets.pop_back();
 	}
 
@@ -44,7 +44,7 @@ bool DB::insertIncomingPacket(int seqn, int timestamp, int realtime, int ssrc){
 
 	incomingPackets.push_back(p);
 
-	while(incomingPackets.size() > 100){
+	while(incomingPackets.size() > 300){
 		incomingPackets.pop_front();
 	}
 

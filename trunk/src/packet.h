@@ -42,6 +42,7 @@ class Packet{
 public:
 	Packet(const u_char*, int);
 	~Packet();
+	int getVersion(){return rtp_header->version;}
 	int getSeqNum(){return ntohs(rtp_header->sequence_number);}
 	int getTimestamp(){return ntohl(rtp_header->timestamp);}
 	int getSsrc(){return ntohl(rtp_header->ssrc_id);}

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# != 1 ]; then
+	echo "usage: $0 hostname"
+	exit
+fi
+
 start=`date +%s`
 
 rrdtool create ping.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:0.5:2:3600 RRA:AVERAGE:0.5:5:3600
@@ -7,7 +12,7 @@ rrdtool create ping.rrd --start $start DS:latency:GAUGE:2:U:U --step 2 RRA:LAST:
 cnt=0
 
 while [ 1 == 1 ]; do
-	tm=`ping -c 1 t23 | grep "time=" | cut -d'=' -f4 | cut -d' ' -f1`
+	tm=`ping -c 1 $1 | grep "time=" | cut -d'=' -f4 | cut -d' ' -f1`
 	rrdtool update ping.rrd `date +%s`:$tm
 	cnt=$(($cnt+1))
 	if [ $(($cnt % 10)) == 0 ]; then

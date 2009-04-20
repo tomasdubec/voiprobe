@@ -6,12 +6,15 @@
 #include "packet_catcher.h"
 #include "reply_server.h"
 #include "latency_computer.h"
+#ifndef DISABLE_SNMP
 #include "snmp.h"
+#endif
 
 using namespace std;
 
 DB *db;
 pthread_mutex_t mtxDB = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mtxPCWait = PTHREAD_MUTEX_INITIALIZER;
 int Latence;
 bool run;
 int histColWidth, histColumns, histStart;
@@ -19,6 +22,7 @@ int *histogram;
 string *legend;
 int packetsProcesed;
 int jitter, jitter1;
+bool master;
 
 string itoa(int number){
 	stringstream s;
@@ -34,6 +38,8 @@ void *runPacketCatcher(void *d){
 
 	cout << "[*] packet catcher thread created\n";
 	//pcatcher = new PacketCatcher(argv[1], argv[2], argv[3]);
+	
+	pthread_mutex_lock(&mtxPCWait); //wait until master/slave is decided
 	pcatcher->start(true);
 
 	//delete pcatcher;
@@ -42,18 +48,19 @@ void *runPacketCatcher(void *d){
 }
 
 void *runReplyServer(void *d){
-	ReplyServer *rs;
+	ReplyServer *rs = (ReplyServer *)d;
 	int port = *(int*)d;
 
 	cout << "[*] reply server thread created\n";
-	rs = new ReplyServer("", port);
+	//rs = new ReplyServer("", port, pc);
 	rs->start();
 
-	delete rs;
+	//delete rs;
 
 	cout << "[+] reply server thread quitting\n";
 }
 
+#ifndef DISABLE_SNMP
 void *runSnmpServer(void *d){
 	Snmp *s = (Snmp*)d;
 
@@ -65,6 +72,7 @@ void *runSnmpServer(void *d){
 
 	cout << "[+] snmp server thread quitting\n";
 }
+#endif
 
 void usage(string myname){
 	cout << "usage: " << myname << " [options]" << endl;
@@ -89,7 +97,12 @@ int main(int argc, char **argv){
 	char c;
 	string myClient, remoteClient, probeIP, interface;
 	int probePort, listenPort;
+	bool disableSnmp = false;
+#ifndef DISABLE_SNMP
+	Snmp *s;
+#endif
 
+	pthread_mutex_lock(&mtxPCWait);
 	histColWidth = histColumns = histStart = -1;
 	myClient = remoteClient = probeIP = interface = "";
 	probePort = listenPort = -1;
@@ -97,7 +110,7 @@ int main(int argc, char **argv){
 	jitter = jitter1 = 0;
 	run = true;
 
-	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:")) != -1){
+	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:d")) != -1){
 		switch(c){
 		case 'i':
 			interface = optarg;
@@ -125,6 +138,9 @@ int main(int argc, char **argv){
 			break;
 		case 'b':
 			histStart = atoi(optarg);
+			break;
+		case 'd':
+			disableSnmp = true;
 			break;
 		case '?':
 			usage(argv[0]);
@@ -157,27 +173,34 @@ int main(int argc, char **argv){
 		exit(-1);
 	}*/
 
-	PacketCatcher pcatcher(interface, myClient, remoteClient);
+	lc = new LatencyComputer(probeIP, probePort, histStart, histColumns, histColWidth);
+
+	PacketCatcher pcatcher(interface, myClient, remoteClient, lc);
 
 	if(pthread_create(&thrCatcher, NULL, runPacketCatcher, (void*)(&pcatcher)) != 0){
 		cerr << "unable to create packet catcher thread!\n";
 		exit(-1);
 	}
 
-	if(pthread_create(&thrReply, NULL, runReplyServer, (void*)(&listenPort)) != 0){
+	ReplyServer rs(&pcatcher, "", listenPort);
+	if(pthread_create(&thrReply, NULL, runReplyServer, (void*)(&rs)) != 0){
 		cerr << "unable to create reply server thread!\n";
 		exit(-1);
 	}
 
-	Snmp s(histStart, histColumns, histColWidth);
-	if(pthread_create(&thrSnmp, NULL, runSnmpServer, (void*)(&s)) != 0){
-		cerr << "unable to create snmp server thread!\n";
-		exit(-1);
+#ifndef DISABLE_SNMP
+	if(!disableSnmp){
+		s = new Snmp(histStart, histColumns, histColWidth);
+		if(pthread_create(&thrSnmp, NULL, runSnmpServer, (void*)(&s)) != 0){
+			cerr << "unable to create snmp server thread!\n";
+			exit(-1);
+		}
 	}
+#endif
 
 	cout << "[*] latency computer thread created\n";
 
-	lc = new LatencyComputer(probeIP, probePort, histStart, histColumns, histColWidth);
+//	lc = new LatencyComputer(probeIP, probePort, histStart, histColumns, histColWidth);
 	lc->start();
 
 	delete lc;
@@ -186,10 +209,17 @@ int main(int argc, char **argv){
 
 	pthread_join(thrCatcher, NULL);
 	pthread_join(thrReply, NULL);
-	pthread_join(thrSnmp, NULL);
+#ifndef DISABLE_SNMP
+	if(!disableSnmp)
+		pthread_join(thrSnmp, NULL);
+#endif
 
 	delete [] histogram;
 	delete db;
+#ifndef DISABLE_SNMP
+	if(!disableSnmp)
+		delete s;
+#endif
 
 	return 0;
 }

@@ -6,6 +6,11 @@
 #define PACKET_REQUEST 1
 #define PACKET_REPLY 2
 #define PACKET_ERROR 3
+#define PACKET_MASTER_ELECTION 4
+#define IAM_MASTER 5
+#define MASTER_ACK 6
+#define IN_SRC_ID 7
+#define OUT_SRC_ID 8
 
 #define PACKET_ERROR_NO_REPLY 1 //probe has no packet in oposite direction to reply with
 

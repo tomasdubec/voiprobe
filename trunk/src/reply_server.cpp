@@ -1,6 +1,7 @@
 #include "reply_server.h"
 
-ReplyServer::ReplyServer(string a, int p){
+ReplyServer::ReplyServer(PacketCatcher *pcat, string a, int p){
+	pc = pcat;
 	address = a;
 	if(p == -1)
 		port = 34567;
@@ -34,16 +35,55 @@ bool ReplyServer::startListen(){
 	return true;
 }
 
+void ReplyServer::decideMaster(){
+	vpPacket *tmp;
+	vpPacket rep;
+	int size;
+	char buf[1000];
+
+
+	if((size = recv(soketka, buf, 1000, NULL)) == -1){
+		perror("reply server decideMaster recv");
+		return;
+	}
+	if(size > 0){
+		buf[size]='\0';
+		tmp = (vpPacket *)buf;
+	}
+	if(ntohl(tmp->packet_number) > getpid()){
+		//i'am the slave :-(
+		rep.type = MASTER_ACK;
+		rep.version = 1;
+		rep.time_shift = 0;
+		rep.packet_number = 0;
+		master = false;
+	}
+	else{
+		//i'am the master:-)!
+		rep.type = IAM_MASTER;
+		rep.version = 1;
+		rep.time_shift = 0;
+		rep.packet_number = 0;
+		master = true;
+	}
+
+	if(send(soketka, &rep, sizeof(vpPacket), NULL) == -1){
+		perror("reply server decideMaster send");
+		return;
+	}
+}
+
 void ReplyServer::start(){
 	sockaddr_in clientInfo;
 	char buf[1000];
 	socklen_t addrlen;
 	int size;
-	int soketka;
+	//int soketka;
 	vpPacket *req;
 	vpPacket tmp;
 	int fid;
 	int32_t timeshift;
+	int isrc, osrc;
 
 	if(!startListen()){
 		perror("error creating server");
@@ -60,6 +100,28 @@ void ReplyServer::start(){
 	}
 
 	cout << "[i] accepted connection from second probe\n";
+
+	decideMaster();
+	if(!master){	//i am not master, i'll wait for SRC IDs a then let packetcatcher run
+		if((size = recv(soketka, &tmp, sizeof(vpPacket), NULL)) == -1){
+			perror("error receiving");
+			return;
+		}
+		if(tmp.type == IN_SRC_ID){
+			isrc = ntohl(tmp.packet_number);
+			cout << "isrc: " << isrc << endl;
+		}
+		if((size = recv(soketka, &tmp, sizeof(vpPacket), NULL)) == -1){
+			perror("error receiving");
+			return;
+		}
+		if(tmp.type == OUT_SRC_ID){
+			osrc = ntohl(tmp.packet_number);
+			cout << "osrc: " << osrc << endl;
+		}
+		pc->setSRCIDs(isrc, osrc);
+		pthread_mutex_unlock(&mtxPCWait);
+	}
 
 	//reply to requests
 	while(run){
