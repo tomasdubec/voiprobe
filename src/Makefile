@@ -1,4 +1,4 @@
-LIBS= -lpcap -lsqlite3 -lpthread `net-snmp-config --libs` `net-snmp-config --agent-libs`
+LIBS= -lpcap -lpthread `net-snmp-config --libs` `net-snmp-config --agent-libs`
 CFLAGS= -c -g
 OBJECTS=voiprobe.o packet_catcher.o packet.o db.o reply_server.o latency_computer.o snmp.o
 

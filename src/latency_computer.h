@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <string.h>
 #include <math.h>
 #include "mypacket.h"
@@ -16,11 +17,13 @@
 
 extern DB *db;
 extern pthread_mutex_t mtxDB;
+extern pthread_mutex_t mtxPCWait;
 extern int Latence;
 extern bool run;
 extern int *histogram;
 extern int packetsProcesed;
 extern int jitter;
+extern bool master;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;
@@ -35,11 +38,13 @@ class LatencyComputer{
 	bool createSharedMem(void);
 	void updateHistogram(int);
 	int round(double);
+	void decideMaster(void);
 public:
 	LatencyComputer(string, int, int, int, int);
 	~LatencyComputer();
 	void start();
 	bool connectProbe();
+	void sendSRCs(int, int);
 };
 
 #endif

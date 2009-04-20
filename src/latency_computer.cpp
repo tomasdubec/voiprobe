@@ -86,6 +86,64 @@ void LatencyComputer::updateHistogram(int l){
 	}
 }
 
+void LatencyComputer::decideMaster(void){
+	vpPacket tmp;
+	int size;
+
+	tmp.type = PACKET_MASTER_ELECTION;
+	tmp.version = 1;
+	tmp.time_shift = 0;
+	tmp.packet_number = htonl(getpid());
+
+	if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
+		perror("decideMaster");
+		return;
+	}
+	if((size = recv(soketka, &tmp, sizeof(vpPacket), NULL)) == -1){
+		perror("LatencyComputer decidemaster recv");
+		return;
+	}
+	if(tmp.type == IAM_MASTER){
+		//iam slave :-(
+		master = false;
+		cout << "[i] i am slave\n";
+
+	}
+	else if(tmp.type == MASTER_ACK){
+		//iam master :-)!
+		master = true;
+		cout << "[i] i am MASTER\n";
+		pthread_mutex_unlock(&mtxPCWait); //let packet catcher go
+	}
+}
+
+void LatencyComputer::sendSRCs(int i, int o){
+	vpPacket tmp;
+
+	//cout << "sending incoming src id " << i << endl;
+	//cout << "sending outgoing src id " << o << endl;
+
+	tmp.type = IN_SRC_ID;
+	tmp.version = 1;
+	tmp.time_shift = 0;
+	tmp.packet_number = htonl(i);
+
+	if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
+		perror("sendSRCs 1");
+		return;
+	}
+
+	tmp.type = OUT_SRC_ID;
+	tmp.version = 1;
+	tmp.time_shift = 0;
+	tmp.packet_number = htonl(o);
+
+	if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
+		perror("sendSRCs 2");
+		return;
+	}
+}
+
 void LatencyComputer::start(){
 	int seqid, timestamp, realtime, ssrc, size, attempt = 0;
 	int rsid, rtimestamp, rrealtime, rssrc;
@@ -109,6 +167,8 @@ void LatencyComputer::start(){
 	}
 	
 	cout << "[i] latency computer connected to probe\n";
+	cout << "[i] deciding master...\n";
+	decideMaster();
 
 	while(run){
 		/*if(packetsProcesed % 100 == 0 && packetsProcesed != 0){

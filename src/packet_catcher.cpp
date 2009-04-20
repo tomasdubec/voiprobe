@@ -2,9 +2,12 @@
 
 using namespace std;
 
-PacketCatcher::PacketCatcher(string iface, string src_host, string dst_host){
+PacketCatcher::PacketCatcher(string iface, string src_host, string dst_host, LatencyComputer *l){
 	char ebuf[PCAP_ERRBUF_SIZE];
 
+	lc = l;
+	ocapture = icapture = false;
+	
 	shost = src_host;
 	dhost = dst_host;
 
@@ -55,11 +58,23 @@ void PacketCatcher::initFilter(void){
 void PacketCatcher::setFilter(string host1, string host2){
 	initFilter();
 	filter += "and (host " + host1 + " or host " + host2 + ")";
+	cout << "filter: " << filter << endl;
 }
 
 void PacketCatcher::setFilter(string src_host, int src_port, string dst_host, int dst_port){
 	initFilter();
 	filter += "and src host " + src_host + " and src port " + itoa(src_port) + " and dst host " + dst_host + " and dst port " + itoa(dst_port);
+}
+
+void PacketCatcher::setSRCIDs(int is, int os){
+	icapture = true;
+	ocapture = true;
+
+	ossrc_lock = os;
+	issrc_lock = is;
+
+	//cout << "locking on incoming src id " << is << endl;
+	//cout << "locking on outgoing src id " << os << endl;
 }
 
 /*
@@ -72,8 +87,6 @@ void PacketCatcher::start(bool adapt){
 	const struct rtp *rtp_header;
 	const u_char *packet;
 	int i = 0;
-	bool ocapture = false, icapture = false;
-	int issrc_lock, ossrc_lock; //for locking on first starting stream detected
 	struct timeval cas;
 	int start_time;
 	long realtime;
@@ -95,21 +108,32 @@ void PacketCatcher::start(bool adapt){
 
 	while(run){
 		packet = pcap_next(pcap_handle, &header);
-		if(packet == NULL)
+		if(packet == NULL || header.len < SIZE_ETHERNET + SIZE_UDP + sizeof(rtp)){
 			continue;
+		}
 
 		gettimeofday(&cas, NULL);
 		realtime = (header.ts.tv_sec - start_time) * 1000000 + header.ts.tv_usec;
 		//realtime = (cas.tv_sec - start_time) * 1000000 + cas.tv_usec;
 
 		Packet p(packet, header.len);
+		//is this really a RTP packet?
+		if(p.getVersion() != 1 && p.getVersion() != 2){
+			continue; //not an RTP packet
+		}
 
+	//	cout << "getStrIP(p.getSHost(): " << getStrIP(p.getSHost()) << endl;
 		if(getStrIP(p.getSHost()) == shost){ // outgoing packet
 			if(!ocapture){//we haven't find the begining of outgoing traffic yet
 				if(p.getMarker() && p.getTimestamp() == 0){
 					ocapture = true;
 					ossrc_lock = p.getSsrc();
-					cout << "* found start of outgoing comunication" << endl;
+					osport = p.getSPort();
+					odport = p.getDPort();
+					cout << "* found start of outgoing comunication (ports " << osport << ":" << odport << ")" << endl;
+					if(master && icapture == true){ //i am master and i have locked myself on streams in both directions. i'll tell the other probe
+						lc->sendSRCs(ossrc_lock, issrc_lock);
+					}
 				}
 				else
 					continue;
@@ -126,7 +150,12 @@ void PacketCatcher::start(bool adapt){
 				if(p.getMarker() && p.getTimestamp() == 0){
 					icapture = true;
 					issrc_lock = p.getSsrc();
-					cout << "* found start of incoming comunication" << endl;
+					isport = p.getSPort();
+					idport = p.getDPort();
+					cout << "* found start of incoming comunication (ports " << isport << ":" << idport << ")" << endl;
+					if(master && ocapture == true){ //i am master and i have locked myself on streams in both directions. i'll tell the other probe
+						lc->sendSRCs(ossrc_lock, issrc_lock);
+					}
 				}
 				else
 					continue;
@@ -148,7 +177,9 @@ void PacketCatcher::start(bool adapt){
 					cout << "\t(p.getTimestamp() - lastTS) / 16 * 1000: " << (p.getTimestamp() - lastTS) / 16 * 1000 << endl;
 					cout << "\tdif: " << dif << endl;*/
 
-					jitter = (0.99 * (double)jitter) + (0.01 * (double)dif); //jitter
+					jitter = (0.9 * (double)jitter) + (0.1 * (double)dif); //jitter
+					//jitter = dif; //jitter
+
 					//jitter1 = (jitter1) * 0.9 + ((double)(jitter1 + ((dif - jitter1) / 16))) * 0.1; //jitter dle rfc1889
 					jitter1 = jitter1 + ((double)(dif1 - jitter1) / 16.0); //jitter dle rfc1889
 				}
