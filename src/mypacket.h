@@ -8,7 +8,7 @@
 #define PACKET_ERROR 3
 #define PACKET_MASTER_ELECTION 4
 #define IAM_MASTER 5
-#define MASTER_ACK 6
+#define ACK 6
 #define IN_SRC_ID 7
 #define OUT_SRC_ID 8
 

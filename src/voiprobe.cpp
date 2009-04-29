@@ -15,6 +15,9 @@ using namespace std;
 DB *db;
 pthread_mutex_t mtxDB = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mtxPCWait = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mtxLCWait = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mtxVoteSenderWait = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mtxVoteReceiverWait = PTHREAD_MUTEX_INITIALIZER;
 int Latence;
 bool run;
 int histColWidth, histColumns, histStart;
@@ -23,6 +26,8 @@ string *legend;
 int packetsProcesed;
 int jitter, jitter1;
 bool master;
+bool vote;
+int voteID;
 
 string itoa(int number){
 	stringstream s;
@@ -103,14 +108,18 @@ int main(int argc, char **argv){
 #endif
 
 	pthread_mutex_lock(&mtxPCWait);
+	pthread_mutex_lock(&mtxVoteSenderWait);
+	pthread_mutex_lock(&mtxVoteReceiverWait);
 	histColWidth = histColumns = histStart = -1;
 	myClient = remoteClient = probeIP = interface = "";
 	probePort = listenPort = -1;
 	Latence = -1;
 	jitter = jitter1 = 0;
 	run = true;
+	master = false;
+	vote = true;
 
-	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:d")) != -1){
+	while((c = getopt(argc, argv, "i:m:r:s:p:l:c:n:b:dM")) != -1){
 		switch(c){
 		case 'i':
 			interface = optarg;
@@ -141,6 +150,9 @@ int main(int argc, char **argv){
 			break;
 		case 'd':
 			disableSnmp = true;
+			break;
+		case 'M':
+			master = true;
 			break;
 		case '?':
 			usage(argv[0]);

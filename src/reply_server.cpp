@@ -36,13 +36,11 @@ bool ReplyServer::startListen(){
 }
 
 void ReplyServer::decideMaster(){
-	vpPacket *tmp;
-	vpPacket rep;
+	vpPacket tmp;
 	int size;
-	char buf[1000];
 
 
-	if((size = recv(soketka, buf, 1000, NULL)) == -1){
+	/*if((size = recv(soketka, buf, 1000, NULL)) == -1){
 		perror("reply server decideMaster recv");
 		return;
 	}
@@ -50,9 +48,26 @@ void ReplyServer::decideMaster(){
 		buf[size]='\0';
 		tmp = (vpPacket *)buf;
 	}
-	if(ntohl(tmp->packet_number) > getpid()){
+
+	if(tmp->type == IAM_MASTER && master){ //hmmm, two masters?
+		rep.type = IAM_MASTER;
+		rep.version = 1;
+		rep.time_shift = 0;
+		rep.packet_number = 0;
+		run = false;
+		cout << "[!] there can't be two masters!\n";
+	}
+	else if(master){
+		//i'am the master:-)!
+		rep.type = IAM_MASTER;
+		rep.version = 1;
+		rep.time_shift = 0;
+		rep.packet_number = 0;
+		master = true;
+	}
+	else if((tmp->type == IAM_MASTER) || (ntohl(tmp->packet_number) > getpid())){
 		//i'am the slave :-(
-		rep.type = MASTER_ACK;
+		rep.type = ACK;
 		rep.version = 1;
 		rep.time_shift = 0;
 		rep.packet_number = 0;
@@ -70,6 +85,37 @@ void ReplyServer::decideMaster(){
 	if(send(soketka, &rep, sizeof(vpPacket), NULL) == -1){
 		perror("reply server decideMaster send");
 		return;
+	}*/
+
+	while(vote){
+		//cout << "*** (rs) locking mtxVoteReceiverWait\n";
+		pthread_mutex_lock(&mtxVoteReceiverWait); //wait till latency computer computes voteID
+
+		//cout << "*** waiting for voteID\n";
+		if((size = recv(soketka, &tmp, sizeof(vpPacket), NULL)) == -1){
+			perror("reply server decideMaster recv");
+			return;
+		}
+		//cout << "*** got voteID: " << ntohl(tmp.packet_number) << endl;
+
+		if(tmp.type != PACKET_MASTER_ELECTION){
+			cerr << "unexpected packet!\n";
+			exit(-1);
+		}
+
+		if(ntohl(tmp.packet_number) > voteID){
+			master = false;
+			vote = false;
+			pthread_mutex_unlock(&mtxVoteSenderWait);
+		}
+		else if(ntohl(tmp.packet_number) < voteID){
+			master = true;
+			vote = false;
+			pthread_mutex_unlock(&mtxVoteSenderWait);
+		}
+		else{ //voteIDs are the same (what are the odds that this will happen, hm?)
+			pthread_mutex_unlock(&mtxVoteSenderWait);
+		}
 	}
 }
 
@@ -120,6 +166,16 @@ void ReplyServer::start(){
 			cout << "osrc: " << osrc << endl;
 		}
 		pc->setSRCIDs(isrc, osrc);
+		//acknowledge receiving of SRC IDs to the other probe
+		tmp.type = ACK;
+		tmp.version = 1;
+		tmp.time_shift = 0;
+		tmp.packet_number = 0;
+		if(send(soketka, &tmp, sizeof(vpPacket), NULL) == -1){
+			perror("send reply server ACK SSRCs");
+			return;
+		}
+
 		pthread_mutex_unlock(&mtxPCWait);
 	}
 
