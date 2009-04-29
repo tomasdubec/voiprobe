@@ -12,8 +12,12 @@
 
 extern DB *db;
 extern pthread_mutex_t mtxDB;
+extern pthread_mutex_t mtxVoteSenderWait;
+extern pthread_mutex_t mtxVoteReceiverWait;
 extern bool run;
 extern bool master;
+extern bool vote;
+extern int voteID;
 
 class ReplyServer{
 	int port;

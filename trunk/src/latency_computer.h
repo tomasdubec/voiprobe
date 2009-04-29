@@ -18,12 +18,17 @@
 extern DB *db;
 extern pthread_mutex_t mtxDB;
 extern pthread_mutex_t mtxPCWait;
+extern pthread_mutex_t mtxLCWait;
+extern pthread_mutex_t mtxVoteSenderWait;
+extern pthread_mutex_t mtxVoteReceiverWait;
 extern int Latence;
 extern bool run;
 extern int *histogram;
 extern int packetsProcesed;
 extern int jitter;
 extern bool master;
+extern bool vote;
+extern int voteID;
 
 class LatencyComputer{
 	int seqid, timestamp, realtime, ssrc;
@@ -35,7 +40,7 @@ class LatencyComputer{
 
 	int histStart, histEnd, histStep, histUnderflowIndex, histOverflowIndex; //histogram parameters
 
-	bool createSharedMem(void);
+	//bool createSharedMem(void);
 	void updateHistogram(int);
 	int round(double);
 	void decideMaster(void);

@@ -21,14 +21,14 @@ LatencyComputer::LatencyComputer(string hst, int prt, int hs, int hc, int cw){
 	histOverflowIndex = hc + 1;
 
 	packetsProcesed = 0;
-	//createSharedMem();
+	pthread_mutex_lock(&mtxLCWait);
 }
 
 LatencyComputer::~LatencyComputer(){
 
 }
 
-bool LatencyComputer::createSharedMem(void){
+/*bool LatencyComputer::createSharedMem(void){
 	int shmid;
 	int tmp;
 
@@ -43,7 +43,7 @@ bool LatencyComputer::createSharedMem(void){
 	}
 
 	return true;
-}
+}*/
 
 bool LatencyComputer::connectProbe(){
 	hostent *host;
@@ -90,10 +90,16 @@ void LatencyComputer::decideMaster(void){
 	vpPacket tmp;
 	int size;
 
-	tmp.type = PACKET_MASTER_ELECTION;
-	tmp.version = 1;
+/*	tmp.version = 1;
 	tmp.time_shift = 0;
-	tmp.packet_number = htonl(getpid());
+	if(master){
+		tmp.type = IAM_MASTER;
+		tmp.packet_number = 0;
+	}
+	else{
+		tmp.type = PACKET_MASTER_ELECTION;
+		tmp.packet_number = htonl(getpid());
+	}
 
 	if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
 		perror("decideMaster");
@@ -103,22 +109,57 @@ void LatencyComputer::decideMaster(void){
 		perror("LatencyComputer decidemaster recv");
 		return;
 	}
-	if(tmp.type == IAM_MASTER){
+
+	if(master && tmp.type == IAM_MASTER){ //two masters? that doesn't sound right
+		run  = false;
+		cout << "[!] there can't be two masters!\n";
+		pthread_mutex_unlock(&mtxPCWait); //let packet catcher go and quit
+	}
+	else if(tmp.type == IAM_MASTER){
 		//iam slave :-(
 		master = false;
 		cout << "[i] i am slave\n";
-
 	}
-	else if(tmp.type == MASTER_ACK){
+	else if(tmp.type == ACK){
 		//iam master :-)!
 		master = true;
 		cout << "[i] i am MASTER\n";
 		pthread_mutex_unlock(&mtxPCWait); //let packet catcher go
+	}*/
+
+	srand(time(NULL));
+
+	while(vote){
+		voteID = rand() % 10000;
+
+		pthread_mutex_unlock(&mtxVoteReceiverWait); // let receiver listen and choose master
+
+		tmp.type = PACKET_MASTER_ELECTION;
+		tmp.version = 1;
+		tmp.time_shift = 0;
+		tmp.packet_number = htonl(voteID);
+
+		//cout << "*** sending my ID: " << voteID << endl;
+		if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
+			perror("decideMaster");
+			exit(-1);
+		}
+
+		pthread_mutex_lock(&mtxVoteSenderWait);
 	}
+	if(master){
+		cout << "[i] I am MASTER\n";
+		pthread_mutex_unlock(&mtxPCWait); //let packet catcher go
+	}
+	else{
+		cout << "[i] I am slave\n";
+	}
+
 }
 
 void LatencyComputer::sendSRCs(int i, int o){
 	vpPacket tmp;
+	int size;
 
 	//cout << "sending incoming src id " << i << endl;
 	//cout << "sending outgoing src id " << o << endl;
@@ -141,6 +182,15 @@ void LatencyComputer::sendSRCs(int i, int o){
 	if(send(soketka, (void *)&tmp, sizeof(vpPacket), NULL) == -1){
 		perror("sendSRCs 2");
 		return;
+	}
+
+	//wait for ACK, then let measuring start
+	if((size = recv(soketka, &tmp, sizeof(vpPacket), NULL)) == -1){
+		perror("LatencyComputer decidemaster recv");
+		return;
+	}
+	if(tmp.type = ACK){
+		pthread_mutex_unlock(&mtxLCWait);
 	}
 }
 
@@ -169,6 +219,10 @@ void LatencyComputer::start(){
 	cout << "[i] latency computer connected to probe\n";
 	cout << "[i] deciding master...\n";
 	decideMaster();
+	//wait until the other probe gets SSRC IDs
+	//if im slave, there will be no outgoing packets, until we have SSRC IDs, so slave can wait in main loop
+	if(master)
+		pthread_mutex_lock(&mtxLCWait);
 
 	while(run){
 		/*if(packetsProcesed % 100 == 0 && packetsProcesed != 0){
